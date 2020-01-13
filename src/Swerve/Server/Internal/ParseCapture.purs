@@ -69,6 +69,11 @@ instance parseCaptureImplConsLit ::
 
 class ParseTypedCapture (s :: Symbol) (name :: Symbol) (ty :: Type) | s -> name ty
 
+instance parseTypedCapture ::
+  ( Symbol.Cons x xs s
+  , ParseTypedCaptureImpl x xs "" name ty
+  ) => ParseTypedCapture s name ty
+
 class ParseTypedCaptureImpl
   (x :: Symbol) (xs :: Symbol) (acc :: Symbol)
   (name :: Symbol) (ty :: Type)

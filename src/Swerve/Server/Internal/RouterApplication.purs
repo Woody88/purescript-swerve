@@ -1,10 +1,9 @@
-module Swerve.Server.Internal.Router where
+module Swerve.Server.Internal.RouteApplication where
 
 import Prelude
 
 import Data.Either (Either(..))
 import Data.Symbol (class IsSymbol, SProxy(..))
-import Effect (Effect)
 import Effect.Exception (throw)
 import Network.Wai (Application)
 import Network.Wai.Internal (Request(..))
@@ -12,7 +11,7 @@ import Prim.Row as Row
 import Prim.RowList as RL
 import Record as Record
 import Swerve.API.RequestMethod (GetRequest)
-import Swerve.Server.Internal.Handler (Handler(..))
+import Swerve.Server.Internal.Handler (Handler)
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
 import Swerve.Server.Internal.Response (class HasResponse, toResponse)
 import Swerve.Server.Internal.Route (Route)

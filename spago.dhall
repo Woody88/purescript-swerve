@@ -11,6 +11,7 @@ You can edit this file as you like.
     , "record-format"
     , "simple-json"
     , "wai"
+    , "warp"
     ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
