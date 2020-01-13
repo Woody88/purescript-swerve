@@ -1,10 +1,9 @@
-module Swerve.Server.Internal.RouteApplication where
+module Swerve.Server.Internal.RouterApplication where
 
 import Prelude
 
 import Data.Either (Either(..))
 import Data.Symbol (class IsSymbol, SProxy(..))
-import Effect.Exception (throw)
 import Network.Wai (Application)
 import Network.Wai.Internal (Request(..))
 import Prim.Row as Row
@@ -13,7 +12,7 @@ import Record as Record
 import Swerve.API.RequestMethod (GetRequest)
 import Swerve.Server.Internal.Handler (Handler)
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
-import Swerve.Server.Internal.Response (class HasResponse, toResponse)
+import Swerve.Server.Internal.Response (class HasResponse, err400Response, toResponse)
 import Swerve.Server.Internal.Route (Route)
 import Type.Data.Row (RProxy)
 import Type.Data.RowList (RLProxy)
@@ -49,7 +48,7 @@ instance registerHandlerGet ::
   , HasResponse route (Handler route resp) 
   ) => RegisterHandler route (Record conn -> Handler route resp) where
   registerHandlerImpl route handler (Request req) respond = case parseCapture (SProxy :: SProxy path) req.rawPathInfo of 
-    Left l -> throw "couldn't match path"
+    Left l -> respond $ err400Response
     Right (p  :: Record prams)  -> do 
       let (conn :: Record conn) = (TypeEq.to $ { params: p })
           handle = handler conn

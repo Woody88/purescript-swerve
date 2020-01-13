@@ -6,17 +6,15 @@ import Data.Either (Either(..))
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Aff (makeAff)
-import Network.HTTP.Types (hContentType, status200, status500)
+import Network.HTTP.Types (hContentType, status200, status400, status500)
 import Network.Wai (responseStr)
 import Network.Wai.Internal (Response)
 import Simple.JSON (class WriteForeign, writeJSON)
 import Swerve.API.MediaType (JSON)
 import Swerve.API.RequestMethod (GetRequest)
-import Swerve.Server.Internal.Handler (Handler(..), runHandler)
+import Swerve.Server.Internal.Handler (Handler, runHandler)
 import Swerve.Server.Internal.Route (Route)
-import Type.Data.Row (RProxy(..))
-import Type.Equality (class TypeEquals)
-import Type.Proxy (Proxy(..))
+import Type.Proxy (Proxy)
 
 class HasResponse route handler | route -> handler where 
     toResponse :: Proxy route -> handler -> Effect Response
@@ -30,3 +28,8 @@ instance hasResponseGet ::
         case resp of 
             Left l -> pure $ responseStr status500 headers (writeJSON status500)
             Right (r :: resp) -> pure $ responseStr status200 headers (writeJSON r)
+
+
+-- need to find a better approach
+err400Response :: Response 
+err400Response = responseStr status400 [ hContentType /\ "application/json" ] (writeJSON status400)
