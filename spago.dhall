@@ -9,6 +9,7 @@ You can edit this file as you like.
     , "http-types"
     , "psci-support"
     , "record-format"
+    , "simple-json"
     , "wai"
     ]
 , packages = ./packages.dhall
