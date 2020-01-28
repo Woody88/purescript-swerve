@@ -1,7 +1,5 @@
 module Swerve.API.MediaType where 
 
+import Data.MediaType (MediaType) as M
 
-data JSON
-data PlainText
-data FormUrlEncoded
-data OctetStream
+newtype MediaType = MediaType M.MediaType

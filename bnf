@@ -1,0 +1,14 @@
+api ::= api :<|> api
+    | method
+
+method ::= Get symbol  rtype specs
+       | Put symbol body  rtype spec
+       | Post symbol body  rtype specs
+       | Delete symbol  rtype specs
+       | Patch symbol body rtype specs
+       | Raw  
+
+specs ::= Accept 
+        | Content-Type 
+        | Headers  
+        | QueryParams

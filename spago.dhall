@@ -6,7 +6,10 @@ You can edit this file as you like.
 , dependencies =
     [ "console"
     , "effect"
+    , "form-urlencoded"
+    , "http-media"
     , "http-types"
+    , "media-types"
     , "psci-support"
     , "record-format"
     , "simple-json"
