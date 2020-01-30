@@ -1,7 +1,9 @@
 module Swerve.API.ContentTypes where 
 
+import Network.HTTP.Media
 import Prelude
 
+import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.FormURLEncoded (FormURLEncoded)
@@ -9,8 +11,6 @@ import Data.FormURLEncoded (encode) as FormURLEncoded
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (fromMaybe)
-import Data.MediaType (MediaType)
-import Data.MediaType.Common as Media
 import Foreign as Foreign
 import Prim.RowList as RL
 import Prim.TypeError as TE
@@ -28,17 +28,21 @@ data NoContent = NoContent
 type Accept a r = ("accept" :: a | r)
 type ContentType a r = ("content-type" :: a | r)
 
+newtype AcceptHeader = AcceptHeader String 
+
+derive instance eqAcceptHeader :: Eq AcceptHeader
+
 class Accepts ctype where 
     contentType :: Proxy ctype -> MediaType
 
 instance acceptJson :: Accepts JSON where 
-    contentType _ = Media.applicationJSON 
+    contentType _ = "application" // "json"
 
 instance acceptPlainText :: Accepts PlainText where 
-    contentType _ = Media.textPlain
+    contentType _ = "text" // "plain"
 
 instance acceptFormUrlEncoded :: Accepts FormUrlEncoded where 
-    contentType _ = Media.applicationFormURLEncoded
+    contentType _ = "application" // "x-www-form-urlencoded"
 
 class Accepts ctype <= MimeRender ctype a where
     mimeRender  :: Proxy ctype -> a -> String 
@@ -54,6 +58,18 @@ else instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncod
 
 else instance mimeRenderPlainText :: Show a => MimeRender PlainText a where 
     mimeRender _ = show
+
+class AllMime ctypes where 
+    allMime :: Proxy ctypes -> Array MediaType 
+
+instance allMimeBase :: Accepts ctype => AllMime ctype where 
+    allMime ctype = [contentType ctype]
+
+else instance allMimeAlt :: (AllMime ctypes, Accepts ctype)  => AllMime (ctype :<|> ctypes) where 
+    allMime _ =  Array.cons (contentType pctype) $ allMime pctypes
+        where 
+            pctype  = Proxy :: Proxy ctype 
+            pctypes = Proxy :: Proxy ctypes
 
 class AllMimeRender ctype a where
     allMimeRender :: Proxy ctype -> a -> Map MediaType String 
