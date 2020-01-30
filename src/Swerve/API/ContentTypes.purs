@@ -10,8 +10,10 @@ import Data.FormURLEncoded (FormURLEncoded)
 import Data.FormURLEncoded (encode) as FormURLEncoded
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (Tuple(..))
 import Foreign as Foreign
+import Network.HTTP.Media as Media
 import Prim.RowList as RL
 import Prim.TypeError as TE
 import Simple.JSON as Json
@@ -44,6 +46,25 @@ instance acceptPlainText :: Accepts PlainText where
 instance acceptFormUrlEncoded :: Accepts FormUrlEncoded where 
     contentType _ = "application" // "x-www-form-urlencoded"
 
+class AllMime ctypes <= AllCTRender ctypes a where
+    handleAcceptH :: Proxy ctypes -> AcceptHeader -> a -> Maybe (Tuple String String)
+
+instance allCTRenderUnit :: 
+    (TE.Fail (TE.Text "No instance for Unit, use NoContent instead.")
+    , Accepts ctype
+    ) => AllCTRender ctype Unit where
+    handleAcceptH _ _ _ = Nothing
+
+else instance allCTRender' :: 
+    (Accept ct
+    , AllMime cts
+    , AllMimeRender cts a
+    ) => AllCTRender cts a where
+    handleAcceptH pctyps (AcceptHeader accept) val = Media.mapAcceptMedia lkup accept
+        where 
+            amrs = allMimeRender pctyps val
+            lkup = map (\(Tuple a b) -> Tuple a (Tuple (Media.renderHeader a) b)) amrs
+
 class Accepts ctype <= MimeRender ctype a where
     mimeRender  :: Proxy ctype -> a -> String 
 
@@ -72,17 +93,23 @@ else instance allMimeAlt :: (AllMime ctypes, Accepts ctype)  => AllMime (ctype :
             pctypes = Proxy :: Proxy ctypes
 
 class AllMimeRender ctype a where
-    allMimeRender :: Proxy ctype -> a -> Map MediaType String 
+    allMimeRender :: Proxy ctype -> a -> Array (Tuple MediaType String)
 
+instance allMimeAltNoContent :: (AllMime ctypes) => AllMimeRender ctypes NoContent where 
+    allMimeRender pxy x = let arr = (allMime pxy) 
+    in Array.zip arr $ Array.replicate (Array.length arr) ""
+        where 
+            pxys = Proxy :: Proxy ctypes  
 
-instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accepts ctype, MimeRender ctype a) => AllMimeRender (ctype :<|> ctypes) a where 
-    allMimeRender _ x = Map.union (Map.singleton (contentType pxy) (mimeRender pxy x)) (allMimeRender pxys x)
+else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accepts ctype, MimeRender ctype a) => AllMimeRender (ctype :<|> ctypes) a where 
+    allMimeRender _ x = Array.cons (Tuple (contentType pxy) (mimeRender pxy x)) $ allMimeRender pxys x
         where 
             pxy  = Proxy :: Proxy ctype 
             pxys = Proxy :: Proxy ctypes  
 
 else instance allMimeRender' :: (Accepts ctype, MimeRender ctype a) => AllMimeRender ctype a where  --- base case  type class 
-    allMimeRender pxy x = Map.singleton (contentType pxy) (mimeRender pxy x)
+    allMimeRender pxy x = [ Tuple (contentType pxy) (mimeRender pxy x) ]
+
 
 class Accepts ctype <= MimeUnrender ctype a where
     mimeUnrender :: Proxy ctype -> String -> Either String a    
