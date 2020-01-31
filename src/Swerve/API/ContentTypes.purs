@@ -36,7 +36,7 @@ derive instance eqAcceptHeader :: Eq AcceptHeader
 
 class Accepts ctype where 
     contentType :: Proxy ctype -> MediaType
-
+    
 instance acceptJson :: Accepts JSON where 
     contentType _ = "application" // "json"
 
@@ -56,8 +56,7 @@ instance allCTRenderUnit ::
     handleAcceptH _ _ _ = Nothing
 
 else instance allCTRender' :: 
-    (Accept ct
-    , AllMime cts
+    ( AllMime cts
     , AllMimeRender cts a
     ) => AllCTRender cts a where
     handleAcceptH pctyps (AcceptHeader accept) val = Media.mapAcceptMedia lkup accept
@@ -74,23 +73,20 @@ instance mimeRenderJson :: Json.WriteForeign a => MimeRender JSON a where
 instance mimeRenderPlainTextString :: MimeRender PlainText String where 
     mimeRender _ = identity
 
-else instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncoded where 
+instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncoded where 
     mimeRender _ = fromMaybe mempty <<< FormURLEncoded.encode
-
-else instance mimeRenderPlainText :: Show a => MimeRender PlainText a where 
-    mimeRender _ = show
 
 class AllMime ctypes where 
     allMime :: Proxy ctypes -> Array MediaType 
 
-instance allMimeBase :: Accepts ctype => AllMime ctype where 
-    allMime ctype = [contentType ctype]
-
-else instance allMimeAlt :: (AllMime ctypes, Accepts ctype)  => AllMime (ctype :<|> ctypes) where 
+instance allMimeAlt :: (AllMime ctypes, Accepts ctype, Accepts ctypes)  => AllMime (ctype :<|> ctypes) where 
     allMime _ =  Array.cons (contentType pctype) $ allMime pctypes
         where 
             pctype  = Proxy :: Proxy ctype 
             pctypes = Proxy :: Proxy ctypes
+
+else instance allMimeBase :: Accepts ctype => AllMime ctype where 
+    allMime ctype = [contentType ctype]
 
 class AllMimeRender ctype a where
     allMimeRender :: Proxy ctype -> a -> Array (Tuple MediaType String)

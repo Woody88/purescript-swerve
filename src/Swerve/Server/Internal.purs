@@ -9,12 +9,14 @@ import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..))
 import Effect (Effect)
 import Effect.Class.Console as Console
+import Network.HTTP.Media as Media
 import Network.HTTP.Types (hAccept, hContentType, status200)
 import Network.Wai (Application, responseStr)
 import Network.Wai.Internal (Request(..), Response)
 import Prim.Row as Row
 import Prim.RowList as RL
 import Record as Record
+import Swerve.API.ContentTypes (class AllMime, allMime)
 import Swerve.API.MediaType (JSON, JSON')
 import Swerve.API.RequestMethod (GetRequest)
 import Swerve.Server.Internal.Handler (Handler)
@@ -73,6 +75,8 @@ instance registerHandlerGet ::
                 Left l -> respond $ NotMatched
                 Right _ -> respond <<< Matched =<< toResponse route handle 
 
+
+
 class HasReqSpec route (spec :: RL.RowList) where 
     reqSpec :: Proxy route -> Request -> RLProxy spec -> Either String (Proxy route)
 
@@ -81,16 +85,18 @@ instance hasReqSpecNil :: HasReqSpec route RL.Nil where
 
 instance hasReqSpecAcceptJson :: 
     ( HasReqSpec route rtail 
-    ) => HasReqSpec route (RL.Cons "accept" JSON' rtail) where 
+    , AllMime ctype
+    ) => HasReqSpec route (RL.Cons "content-type" ctype rtail) where 
     reqSpec route rq@(Request req) _ = do 
         let lookupHeader = flip Map.lookup $ Map.fromFoldable req.requestHeaders 
-        (acceptContent $ lookupHeader $ String.toLower hAccept) >>= \routeResult -> reqSpec routeResult rq (RLProxy :: RLProxy rtail)
+            mCtHeader = lookupHeader $ String.toLower hContentType
+            options = allMime (Proxy :: Proxy ctype)
+        (acceptContent $ mCtHeader >>= Media.matchAccept options) >>= \routeResult -> reqSpec routeResult rq (RLProxy :: RLProxy rtail)
         where 
             acceptContent mCtype
-                | Just ctype <- mCtype
-                , ctype == "application/json" = Right route 
+                | Just ctype <- mCtype = Right route 
                 | otherwise = Left "content type header not found"
 
 
-
-        
+ct_wildcard :: String
+ct_wildcard = "*" <> "/" <> "*" 
