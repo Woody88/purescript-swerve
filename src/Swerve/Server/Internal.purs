@@ -83,7 +83,7 @@ class HasReqSpec route (spec :: RL.RowList) where
 instance hasReqSpecNil :: HasReqSpec route RL.Nil where 
     reqSpec route _ _ = pure route 
 
-instance hasReqSpecAcceptJson :: 
+instance hasReqSpecContentType :: 
     ( HasReqSpec route rtail 
     , AllMime ctype
     ) => HasReqSpec route (RL.Cons "content-type" ctype rtail) where 
