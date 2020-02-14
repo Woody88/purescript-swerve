@@ -13,6 +13,7 @@ You can edit this file as you like.
     , "psci-support"
     , "record-format"
     , "simple-json"
+    , "typelevel-prelude"
     , "wai"
     , "warp"
     ]
