@@ -32,9 +32,9 @@ import Type.Equality as TypeEq
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
-type Connection 
-  = ( body   :: forall bdy. bdy
-    , params :: forall prams. prams
+type Connection bdy prams
+  = ( body   :: bdy
+    , params :: prams
     )
 
 data Server (api :: # Type) = Server 
@@ -69,9 +69,11 @@ instance registerHandlerGet ::
   , TypeEquals (Route path GetRequest bdy resp ctype spec) route
   , RL.RowToList spec specL
   , HasResponse route (Handler route resp) 
-  , HasSpec route specL params' conn
-  , Row.Union conn trash Connection
-  ) => RegisterHandler route (Record conn -> Handler route resp) where
+  , HasSpec route specL () specs
+  , Row.Union specs params' conn 
+  , Row.Nub conn conn' 
+  , TypeEquals { | conn'} (Record (Connection bdy { | params'}))
+  ) => RegisterHandler route ({ | conn'} -> Handler route resp) where
   registerHandlerImpl route handler rq@(Request req) respond = do 
     case parseCapture (SProxy :: SProxy path) req.rawPathInfo of 
       Left l -> respond $ NotMatched
@@ -80,7 +82,8 @@ instance registerHandlerGet ::
         case runSpec route (RLProxy :: RLProxy specL) rq of
           Left l -> respond $ NotMatched
           Right c -> do 
-            let (conn :: Record conn) = Builder.build c c' 
+            let (specs :: Record specs) = Builder.build c {}
+                (conn :: {| conn'}) = Record.merge specs c'
                 handle = handler conn
             respond <<< Matched =<< toResponse route handle 
 
@@ -110,8 +113,8 @@ instance hasSpecContentType ::
       Just ctt -> runSpec route (RLProxy :: RLProxy rtail) rq
       Nothing  -> Left $ "content-type invalid"
 
--- else instance hasSpecNil :: (RL.RowToList spec RL.Nil) => HasSpec route spec () () where 
---   runSpec route specs rq@(Request req) = pure identity
+else instance hasSpecNil :: HasSpec route RL.Nil () () where 
+  runSpec route specs rq@(Request req) = pure identity
 
 rowToList :: forall row list. RL.RowToList row list => RProxy row -> RLProxy list 
 rowToList _ = RLProxy
