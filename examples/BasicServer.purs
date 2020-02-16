@@ -16,10 +16,10 @@ import Swerve.Server.Internal.Route (Get)
 
 type User = {name :: String, id :: Int }
 
-type GetUser = Get "/user/{id:Int}" User JSON ("content-type" :: CT.JSON)
+type GetUser = Get "/user" User JSON ("content-type" :: CT.JSON, "accept" :: CT.JSON)
 
-getUser :: {params :: { id :: Int} } -> Handler GetUser User 
-getUser conn = pure $  {name: "Woodson", id: conn.params.id }
+getUser :: Handler GetUser User 
+getUser = pure $  {name: "Woodson", id: 5 }
 
 type UserAPI = (getUser :: GetUser)
 
@@ -27,7 +27,7 @@ api :: Server UserAPI
 api = Server
 
 app :: Application 
-app = swerve api { getUser: getUser }
+app = swerve api { getUser: \_ -> getUser }
 
 main :: Effect Unit
 main = do 

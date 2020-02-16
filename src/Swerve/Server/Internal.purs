@@ -34,7 +34,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 type Connection bdy prams
   = ( body   :: bdy
-    , params :: prams
+    , params :: Record prams
     )
 
 data Server (api :: # Type) = Server 
@@ -62,41 +62,38 @@ instance routesHandlersCons ::
 class RegisterHandler route handler | route  -> handler where 
   registerHandlerImpl :: Proxy route -> handler -> RoutingApplication
 
-instance registerHandlerGet :: 
+instance registerHandlerWithCapture :: 
   ( ParseCapture path prams
   , IsSymbol path
   , TypeEquals { params :: { | prams}} (Record params') 
   , TypeEquals (Route path GetRequest bdy resp ctype spec) route
   , RL.RowToList spec specL
+  , HasSpec route specL params' conn
+  , Row.Union conn trash to 
   , HasResponse route (Handler route resp) 
-  , HasSpec route specL () specs
-  , Row.Union specs params' conn 
-  , Row.Nub conn conn' 
-  , TypeEquals { | conn'} (Record (Connection bdy { | params'}))
-  ) => RegisterHandler route ({ | conn'} -> Handler route resp) where
+  ) => RegisterHandler route ({ | conn} -> Handler route resp) where
   registerHandlerImpl route handler rq@(Request req) respond = do 
     case parseCapture (SProxy :: SProxy path) req.rawPathInfo of 
       Left l -> respond $ NotMatched
       Right (p  :: Record prams)  -> do
-        let (c' :: Record params') = (TypeEq.to $ { params: p })
-        case runSpec route (RLProxy :: RLProxy specL) rq of
-          Left l -> respond $ NotMatched
-          Right c -> do 
-            let (specs :: Record specs) = Builder.build c {}
-                (conn :: {| conn'}) = Record.merge specs c'
-                handle = handler conn
+        case runSpec route (RLProxy :: RLProxy specL) rq of 
+           Left l -> respond $ NotMatched
+           Right c -> do 
+            let (conn :: Record params') = (TypeEq.to $ { params: p })
+                m  = Builder.build c conn
+                handle = handler m
             respond <<< Matched =<< toResponse route handle 
 
-  -- do 
-    -- case parseCapture (SProxy :: SProxy path) req.rawPathInfo of 
-    --     Left l -> respond $ NotMatched
-    --     Right (p  :: Record prams)  -> do
-    --         let (conn :: Record conn) = (TypeEq.to $ { params: p })
-    --             handle = handler conn
-    --         case reqSpec route rq (RLProxy :: RLProxy specL) of 
-    --             Left l -> respond $ NotMatched
-    --             Right _ -> respond <<< Matched =<< toResponse route handle 
+-- | This will build the connection for handlers.
+-- | The purpose of the connection is to inject rows that might be useful
+-- | i.e: request body, params, query params, header, etc...
+class ConnBuilder route (specL :: RL.RowList) (from :: # Type) (to :: # Type) | specL -> from to where 
+  connBuilder :: Proxy route -> RLProxy specL -> Request -> Either String (Builder { | from } { | to })
 
+-- | ReqFilter will act like a circuit breaker, if the implementation of any spec
+-- | does not return a Unit, this means that the request cannot be accepted
+class ReqFilter route (specL :: RL.RowList) where 
+  reqFilter :: Proxy route -> RLProxy specL -> Request -> Either String Unit 
 
 
 class HasSpec route (specL :: RL.RowList) (from :: # Type) (to :: # Type) | specL -> from to where 
@@ -113,11 +110,19 @@ instance hasSpecContentType ::
       Just ctt -> runSpec route (RLProxy :: RLProxy rtail) rq
       Nothing  -> Left $ "content-type invalid"
 
-else instance hasSpecNil :: HasSpec route RL.Nil () () where 
-  runSpec route specs rq@(Request req) = pure identity
+instance hasSpecAccept :: 
+  ( Accepts ctype
+  , HasSpec route rtail from to
+  ) => HasSpec route (RL.Cons "accept" ctype rtail) from to where 
+  runSpec route specs rq@(Request req) = do 
+    let headers = Map.fromFoldable $ req.requestHeaders
+        ct = show $ contentType (Proxy :: Proxy ctype)
+    case Map.lookup hContentType headers of 
+      Just ctt -> runSpec route (RLProxy :: RLProxy rtail) rq
+      Nothing  -> Left $ "accept invalid"
 
-rowToList :: forall row list. RL.RowToList row list => RProxy row -> RLProxy list 
-rowToList _ = RLProxy
+instance hasSpecNil :: Row.Union conn trash (Connection bdy prams) =>  HasSpec route RL.Nil conn conn where 
+  runSpec route specs rq@(Request req) = pure identity
 
 -- class HasReqSpec route (spec :: RL.RowList) where 
 --     reqSpec :: Proxy route -> Request -> RLProxy spec -> Either String (Proxy route)
