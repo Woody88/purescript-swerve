@@ -15,6 +15,8 @@ import Swerve.Server.Internal.Handler (Handler(..))
 import Swerve.Server.Internal.Route (Get)
 
 type User = {name :: String, id :: Int }
+type MyRow r = ( "woodson" :: String | r )
+type MyRow2 = ( "woodson" :: Int | MyRow () )
 
 type GetUser = Get "/user" User JSON ("content-type" :: CT.JSON, "accept" :: CT.JSON)
 

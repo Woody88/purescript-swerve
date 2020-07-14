@@ -18,6 +18,7 @@ import Record as Record
 import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.API.ContentTypes (class Accepts, class AllMime, allMime, contentType)
+import Swerve.API.Context (Context(..))
 import Swerve.API.MediaType (JSON, JSON')
 import Swerve.API.RequestMethod (GetRequest)
 import Swerve.Server.Internal.Handler (Handler)
@@ -88,12 +89,12 @@ instance registerHandlerWithCapture ::
 -- | The purpose of the connection is to inject rows that might be useful
 -- | i.e: request body, params, query params, header, etc...
 class ConnBuilder route (specL :: RL.RowList) (from :: # Type) (to :: # Type) | specL -> from to where 
-  connBuilder :: Proxy route -> RLProxy specL -> Request -> Either String (Builder { | from } { | to })
+  connBuilder :: Proxy route -> RLProxy specL -> Context -> Either String (Builder { | from } { | to })
 
 -- | ReqFilter will act like a circuit breaker, if the implementation of any spec
 -- | does not return a Unit, this means that the request cannot be accepted
 class ReqFilter route (specL :: RL.RowList) where 
-  reqFilter :: Proxy route -> RLProxy specL -> Request -> Either String Unit 
+  reqFilter :: Proxy route -> RLProxy specL -> Context -> Either String Unit 
 
 
 class HasSpec route (specL :: RL.RowList) (from :: # Type) (to :: # Type) | specL -> from to where 

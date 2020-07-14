@@ -9,5 +9,7 @@ data Route (path :: Symbol) (method :: RequestMethod) body resp (ctype :: MediaT
 
 type Get url res ctype props = Route url GetRequest Void res ctype props 
 
+type Post url res body ctype props = Route url GetRequest body res ctype props 
+
 data RouteResult a = NotMatched | Matched a
 
