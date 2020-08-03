@@ -32,6 +32,7 @@ module Swerve.Server.Internal where
 -- import Type.Proxy (Proxy(..))
 -- import Unsafe.Coerce (unsafeCoerce)
 
+class HasServer api handlers 
 -- type Connection bdy prams
 --   = ( body   :: bdy
 --     , params :: Record prams

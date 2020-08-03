@@ -1,5 +1,5 @@
 module Swerve.API.Spec where 
 
-import Type.Row (type (+))
+-- import Type.Row (type (+))
 
-type Spec specs = specs + () 
+-- type Spec specs = specs + () 
