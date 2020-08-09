@@ -1,47 +1,142 @@
 module Swerve.Server.Internal where
 
--- import Prelude
+import Prelude
 
--- import Data.Either (Either(..))
--- import Data.Map as Map
--- import Data.Maybe (Maybe(..))
--- import Data.String as String
--- import Data.Symbol (class IsSymbol, SProxy(..))
--- import Effect.Class.Console as Console
--- import Network.HTTP.Media as Media
--- import Network.HTTP.Types (hAccept, hContentType, status200)
--- import Network.Wai (Application, Request(..), Response, responseStr)
--- import Prim.Row as Row
--- import Prim.RowList as RL
--- import Record as Record
--- import Record.Builder (Builder)
--- import Record.Builder as Builder
--- import Swerve.API.ContentTypes (class Accepts, class AllMime, allMime, contentType)
--- import Swerve.API.Context (Context(..))
--- import Swerve.API.MediaType (JSON, JSON')
--- import Swerve.API.RequestMethod (GetRequest)
--- import Swerve.Server.Internal.Handler (Handler)
--- import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
--- import Swerve.Server.Internal.Response (class HasResponse, class HasResponse', err400Response, toResponse, toResponse')
--- import Swerve.Server.Internal.Route (Route, RouteResult(..))
--- import Swerve.Server.Internal.RouterApplication (RoutingApplication)
--- import Type.Data.Row (RProxy(..))
--- import Type.Data.RowList (RLProxy(..))
--- import Type.Equality (class TypeEquals)
--- import Type.Equality as TypeEq
--- import Type.Proxy (Proxy(..))
--- import Unsafe.Coerce (unsafeCoerce)
+import Control.Alt ((<|>))
+import Control.Monad.Except (ExceptT(..), runExceptT)
+import Control.Monad.Reader (runReaderT)
+import Data.Either (Either(..))
+import Data.Int as Int
+import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..))
+import Data.String as String
+import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Tuple (Tuple(..))
+import Effect.Aff (Aff)
+import Network.HTTP.Types (ok200)
+import Network.Wai (Application, Request(..), responseStr)
+import Network.Warp (pathInfo)
+import Prim.Row as Row
+import Prim.RowList (class RowToList, kind RowList)
+import Prim.RowList as RL
+import Prim.Symbol as Symbol
+import Record as Record
+import Record as Reord
+import Record.Builder (Builder)
+import Record.Builder as Builder
+import Record.Builder as Builder
+import Swerve.API.Verb (GET, Verb)
+import Swerve.Server.Internal.Handler (Handler'(..), Handler)
+import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PPath(..), PProxy(..), Segment, kind PList, kind Path)
+import Type.Data.Row (RProxy(..))
+import Type.Data.RowList (RLProxy(..))
+import Type.Proxy (Proxy(..))
+import URI.Extra.QueryPairs (valueFromString)
 
-class HasServer api handlers 
+type ConnectionRow cap 
+  = ( capture :: Record cap
+    -- , query   :: Record qry
+    )
+
+class ReadCapture a where 
+  readCapture :: String -> Maybe a 
+
+instance readCaptureString :: ReadCapture String where 
+  readCapture x = Just x 
+
+instance readCaptureInt :: ReadCapture Int where 
+  readCapture = Int.fromString
+
+class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) where 
+  parseRoute :: SProxy url -> RProxy specs -> String -> Either String { | conn }
+
+instance parseRouteImpl :: 
+  ( Parse url xs 
+  , RowToList specs specsrl 
+  , ParsePath xs specsrl (ConnectionRow ()) conn
+  ) => ParseRoute url specs conn where 
+  parseRoute _ _ url = flip Builder.build {capture: {}} <$> parsePath (PProxy :: _ xs) (RLProxy :: _ specsrl) url url 
+
+class ParsePath (xs :: PList) (specs :: RowList) (from :: # Type) (to :: # Type)  | xs -> from to where
+  parsePath :: PProxy xs -> RLProxy specs -> String -> String -> Either String (Builder { | from } { | to })
+
+instance parsePathNil :: ParsePath PNil specs to to where
+  parsePath _ _ _ _ = pure identity 
+
+instance parseCapture :: 
+  ( IsSymbol var
+  , IsSymbol capture
+  , Symbol.Cons h t capture
+  , Symbol.Cons h t "capture"
+  , Row.Cons var vtype ctail ctype 
+  , Row.Cons var vtype from' to
+  , ReadCapture vtype
+  , Row.Lacks var ctail
+  , Row.Cons capture { | ctype } from' to
+  , Row.Cons capture { | ctail } from' from'    
+  , ParsePath tail spcstl from from'
+  ) => ParsePath (PCons (CaptureVar var) tail) (RL.Cons capture { | ctype} spcstl) from to where
+  parsePath _ specs url url' = do
+    let { after, before } = String.splitAt 1 url 
+        (Tuple var tail)  = case flip String.splitAt after <$> readIndex after of 
+                              Nothing                -> (Tuple after "")
+                              Just {after: after', before: before'} -> Tuple before' after'
+    case readCapture var of 
+      Nothing -> Left "capture could not be parsed."
+      Just (v :: vtype) -> do 
+        rest <- parsePath (PProxy :: _ tail) (RLProxy :: _ spcstl) tail url'
+        let x = Builder.modify captureP (\r ->  Record.insert varP v r)
+        pure $ x <<< rest
+    where
+      readIndex u = String.indexOf (Pattern "/") u <|> String.indexOf (Pattern "?") u
+      captureP = (SProxy :: _ capture)
+      varP = (SProxy :: _ var)
+
+instance parseSegmentRoot :: ParsePath tail specs from to => ParsePath (PCons (Segment "") tail) specs from to where 
+  parsePath _ specs url url' 
+    | Just tail <- String.stripPrefix (Pattern "/") url = parsePath (PProxy :: _ tail) specs url url'
+    | otherwise = Left $ "could not parse root from '" <> url' <> "'" 
+
+else instance parseSegment :: 
+  ( IsSymbol seg 
+  , ParsePath tail specs from to
+  ) => ParsePath (PCons (Segment seg) tail) specs from to where 
+  parsePath _ specs url url' = do
+    let { after, before } = String.splitAt 1 url 
+    case String.stripPrefix (Pattern segment) after of  
+      Just tail -> parsePath (PProxy :: _ tail) specs tail url'
+      otherwise -> Left $ "could not parse segment '" <> segment <> "' from '" <> url' <> "'" 
+    where 
+      segment = reflectSymbol (SProxy :: _ seg)
+
+-- class Router layout handler | layout -> handler where
+--   route :: Proxy layout -> handler -> Application
+
+-- class HasContent (specs ::  # Type) ct | specs -> ct
+
+-- instance aHasContent :: Row.Cons "content" ct t specs => HasContent specs ct
+
+-- instance routePath :: Router (Verb v path specs) handler where 
+--   route _ handler = \req res -> do 
+--     pure unit 
+
+-- instance routerGet :: (MkConnection specs conn, HasContent specs ct) => Router (Verb GET path specs) (Handler' (Verb GET path specs) conn ct) where 
+--   route _ (Handler handler) = \req res -> do it 
+--       Just conn -> do
+--         eResult <- runExceptT $ runReaderT handler conn
+--         case eResult of 
+--           Right r -> res $ responseStr ok200 [] "Hello, World!" 
+--           Left e -> pure unit
+
+
+-- swerve :: forall layout handler. Router layout handler => Proxy layout -> handler -> Application 
+-- swerve = route
+
 -- type Connection bdy prams
 --   = ( body   :: bdy
 --     , params :: Record prams
 --     )
 
--- data Server (api :: # Type) = Server 
-
--- class HasServer api handlers | api -> handlers where
---     route :: Server api -> Record handlers -> RoutingApplication
 
 -- class RoutesHandlers (routesL :: RL.RowList) (routes :: # Type) (handlers :: # Type) | routesL -> routes handlers where  
 --   matchRoutesImpl :: RLProxy routesL -> RProxy routes -> Record handlers -> RoutingApplication
@@ -152,4 +247,4 @@ class HasServer api handlers
 
 
 -- ct_wildcard :: String
--- ct_wildcard = "*" <> "/" <> "*" 
+-- ct_wildcard = "*" <> "/" <> "*"

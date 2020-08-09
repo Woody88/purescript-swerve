@@ -11,5 +11,5 @@ module Swerve.Server.Internal.Route where
 
 -- type Post url res body ctype props = Route url GetRequest body res ctype props 
 
--- data RouteResult a = NotMatched | Matched a
+data RouteResult a = NotMatched | Matched a
 

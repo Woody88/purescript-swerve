@@ -14,6 +14,7 @@ foreign import kind PList
 foreign import data PNil :: PList
 foreign import data PCons :: Path -> PList -> PList
 
+data PPath (p :: Path) = PPath
 data PProxy (pl :: PList) = PProxy
 
 class Parse (string :: Symbol) (format :: PList) | string -> format

@@ -1,0 +1,58 @@
+
+type ContactAPI = CreateUser <|> DeleteUser
+
+data UserDetail = UserDetail { name :: String, phoneNumber :: PhoneNumber }
+
+type CreateUser 
+    = Get "/users?[minAge]&[maxAge]" 
+        ( ReqBody UserDetail (JSON <|> XML)
+        , Content User JSON
+        , QueryParams {minAge :: Int, maxAge :: Int }
+        , Headers (Header "x-forwaded" String)
+        )
+
+createUser :: Handler CreateUser User 
+createUser = do 
+    let userDetails = conn.body 
+        id = conn.capture.id 
+        headers = conn.queryParams 
+    withHeaders {"x-forwaded": "hello-world"} $ User {id: "woodson"}
+
+
+runServer (Proxy :: _ ContactAPI) (createUser <|> deleteUser)
+
+
+
+
+
+request 
+    |
+    |
+Filter Path 
+    |
+    |
+Filter ContentType 
+    |
+    | 
+Filter AcceptType
+    |
+    | 
+Filter Headers 
+
+
+
+
+
+class Filter a where 
+    filter :: Proxy a -> Either String Connection
+
+instance 
+    ( ParseCapture path prams
+    , IsSymbol path
+    , TypeEquals { params :: { | prams}} prms
+    , TypeEquals (Route path GetRequest bdy resp ctype spec) route
+    , Row.Union prms trash Connection
+    ) => Filter route where 
+filter proute = ...  
+
+
