@@ -1,6 +1,13 @@
 module Swerve.Server where
 
-import Prelude 
+import Prelude
+
+import Data.Either (Either)
+import Data.Symbol (SProxy(..))
+import Swerve.Server.Internal (parsePath, parseRoute)
+import Swerve.Server.Internal.Path (CaptureVar, PCons, PNil, PProxy(..))
+import Type.Data.RowList (RLProxy(..))
+import Type.Row (RProxy(..))
 
 -- import Network.Wai (Application)
 -- import Prim.RowList as RL
@@ -15,5 +22,20 @@ import Prelude
 --   => Server api
 --   -> Record handlers
 --   -> Application
--- swerve api handlers = toApplication $ matchRoutesImpl (RLProxy :: RLProxy apiL) (RProxy :: RProxy api) handlers 
+-- swerve api handlers = toApplication $ matchRoutesImpl (RLProxy :: RLProxy apiL) (RProxy :: RProxy api) handlers
 
+
+urlSpec :: SProxy "/:id"
+urlSpec = SProxy
+
+specs :: RProxy (capture :: { id :: Int })
+specs = RProxy
+
+url :: String
+url = "/user/1"
+
+foo :: Either String
+  { capture :: Record ()
+  , id :: Int
+  }
+foo = parseRoute urlSpec specs url
