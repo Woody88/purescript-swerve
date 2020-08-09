@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Either (Either)
 import Data.Symbol (SProxy(..))
-import Swerve.Server.Internal (parseFullRoute, parsePath, parseRoute)
+import Swerve.Server.Internal (parsePath, parseRoute)
 import Swerve.Server.Internal.Path (CaptureVar, PCons, PNil, PProxy(..))
 import Type.Data.RowList (RLProxy(..))
 import Type.Row (RProxy(..))
@@ -25,17 +25,13 @@ import Type.Row (RProxy(..))
 -- swerve api handlers = toApplication $ matchRoutesImpl (RLProxy :: RLProxy apiL) (RProxy :: RProxy api) handlers
 
 
-urlSpec :: SProxy "/:id"
+urlSpec :: SProxy "/:id?[minAge]"
 urlSpec = SProxy
 
-specs :: RProxy (capture :: { id :: Int })
+specs :: RProxy (capture :: { id :: Int }, query :: { minAge :: Int })
 specs = RProxy
 
 url :: String
 url = "/user/1"
 
-foo :: Either String
-  { capture :: { id :: Int
-               }
-  }
-foo = parseFullRoute urlSpec specs url
+foo = parseRoute urlSpec specs url
