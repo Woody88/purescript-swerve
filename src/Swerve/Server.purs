@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Either (Either)
 import Data.Symbol (SProxy(..))
-import Swerve.Server.Internal (parsePath, parseRoute)
+import Swerve.Server.Internal (parseFullRoute, parsePath, parseRoute)
 import Swerve.Server.Internal.Path (CaptureVar, PCons, PNil, PProxy(..))
 import Type.Data.RowList (RLProxy(..))
 import Type.Row (RProxy(..))
@@ -35,7 +35,7 @@ url :: String
 url = "/user/1"
 
 foo :: Either String
-  { capture :: Record ()
-  , id :: Int
+  { capture :: { id :: Int
+               }
   }
-foo = parseRoute urlSpec specs url
+foo = parseFullRoute urlSpec specs url

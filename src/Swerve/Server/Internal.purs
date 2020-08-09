@@ -47,14 +47,21 @@ instance readCaptureString :: ReadCapture String where
 instance readCaptureInt :: ReadCapture Int where
   readCapture = Int.fromString
 
+parseFullRoute ::
+  forall url specs conn.
+  ParseRoute url specs conn =>
+  SProxy url -> RProxy specs -> String -> Either String {|ConnectionRow conn}
+parseFullRoute sp rp url =
+  { capture: _ } <$> parseRoute sp rp url
+
 class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) where
   parseRoute :: SProxy url -> RProxy specs -> String -> Either String { | conn }
 
 instance parseRouteImpl ::
   ( Parse url xs
-  , ParsePath xs specs (ConnectionRow ()) conn
+  , ParsePath xs specs () conn
   ) => ParseRoute url specs conn where
-  parseRoute _ _ url = flip Builder.build {capture: {}} <$> parsePath (PProxy :: _ xs) (RProxy :: _ specs) url url
+  parseRoute _ _ url = flip Builder.build {} <$> parsePath (PProxy :: _ xs) (RProxy :: _ specs) url url
 
 class ParsePath (xs :: PList) (specs :: # Type) (from :: # Type) (to :: # Type)  | xs -> from to where
   parsePath :: PProxy xs -> RProxy specs -> String -> String -> Either String (Builder { | from } { | to })
