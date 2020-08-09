@@ -34,4 +34,10 @@ specs = RProxy
 url :: String
 url = "/user/1"
 
+foo :: Either String
+  { capture :: { id :: Int
+               }
+  , query :: { minAge :: Int
+             }
+  }
 foo = parseRoute urlSpec specs url
