@@ -47,13 +47,13 @@ instance readCaptureString :: ReadCapture String where
 instance readCaptureInt :: ReadCapture Int where
   readCapture = Int.fromString
 
-class ParseRoute (url :: Symbol) (specs :: # Type) (cap :: # Type) (qry :: # Type) where
-  parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|ConnectionRow cap qry}
+class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
+  parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|conn}
 
 instance parseRouteImpl ::
   ( Parse url xs
   , ParsePath xs specs () cap () qry
-  ) => ParseRoute url specs cap qry where
+  ) => ParseRoute url specs (capture :: {|cap}, query :: {|qry}) where
   parseRoute _ _ url = bldrs <#> \b ->
     { capture: Builder.build b.capture {}
     , query: Builder.build b.query {}
