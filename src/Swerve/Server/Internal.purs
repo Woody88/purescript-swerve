@@ -78,19 +78,23 @@ instance subrecordRLCons ::
       v = Record.get sp base
       hBuilder = Builder.insert (SProxy :: _ k) v
 
-class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
-  parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|conn}
+class ParseRoute (url :: Symbol) (specs :: # Type) where
+  parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|specs}
 
 instance parseRouteImpl ::
   ( Parse url xs
   , ParsePath xs specs () cap () qry
-  ) => ParseRoute url specs (capture :: {|cap}, query :: {|qry}) where
-  parseRoute _ _ url = bldrs <#> \b ->
-    { capture: Builder.build b.capture {}
-    , query: Builder.build b.query {}
-    }
+  , Subrecord (ConnectionRow cap qry) specs
+  ) => ParseRoute url specs where
+  parseRoute _ _ url = subrecord <$> conn
     where
       bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url url
+
+      conn :: Either String {|ConnectionRow cap qry}
+      conn = bldrs <#> \b ->
+        { capture: Builder.build b.capture {}
+        , query: Builder.build b.query {}
+        }
 
 class ParsePath (xs :: PList) (specs :: # Type) (capfrom :: # Type) (capto :: # Type) (queryfrom :: # Type) (queryto :: # Type) | xs -> capfrom capto queryfrom queryto where
   parsePath :: PProxy xs -> RProxy specs -> String -> String -> Either String { capture :: Builder { | capfrom } { | capto }

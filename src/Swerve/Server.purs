@@ -25,19 +25,27 @@ import Type.Row (RProxy(..))
 -- swerve api handlers = toApplication $ matchRoutesImpl (RLProxy :: RLProxy apiL) (RProxy :: RProxy api) handlers
 
 
-urlSpec :: SProxy "/:id?[minAge]"
-urlSpec = SProxy
-
-specs :: RProxy (capture :: { id :: Int }, query :: { minAge :: Int })
-specs = RProxy
-
 url :: String
 url = "/user/1"
 
-foo :: Either String
+capAndQuery :: Either String
   { capture :: { id :: Int
                }
   , query :: { minAge :: Int
              }
   }
-foo = parseRoute urlSpec specs url
+capAndQuery =
+  parseRoute
+  (SProxy :: _ "/:id?[minAge]")
+  (RProxy :: _ (capture :: { id :: Int }, query :: { minAge :: Int }))
+  url
+
+capOnly :: Either String
+  { capture :: { id :: Int
+               }
+  }
+capOnly =
+  parseRoute
+  (SProxy :: _ "/:id")
+  (RProxy :: _ (capture :: { id :: Int }))
+  url
