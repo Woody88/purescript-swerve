@@ -16,8 +16,9 @@ import Effect.Aff (Aff)
 import Network.HTTP.Types (ok200)
 import Network.Wai (Application, Request(..), responseStr)
 import Network.Warp (pathInfo)
+import Prim.Row (class Cons)
 import Prim.Row as Row
-import Prim.RowList (class RowToList, kind RowList)
+import Prim.RowList (class RowToList, Cons, Nil, kind RowList)
 import Prim.RowList as RL
 import Prim.Symbol as Symbol
 import Record as Record
@@ -46,6 +47,36 @@ instance readCaptureString :: ReadCapture String where
 
 instance readCaptureInt :: ReadCapture Int where
   readCapture = Int.fromString
+
+class Subrecord (base :: # Type) (sub :: # Type) where
+  subrecord :: {|base} -> {|sub}
+
+instance subrecordI ::
+  ( RowToList sub rl
+  , SubrecordRL base rl () sub
+  ) => Subrecord base sub where
+  subrecord base =
+    Builder.build (subrecordRL base (RLProxy :: _ rl)) {}
+
+class SubrecordRL (base :: # Type) (rl :: RowList) (from :: # Type) (to :: # Type) | rl -> from to where
+  subrecordRL :: {|base} -> RLProxy rl -> Builder {|from} {|to}
+
+instance subrecordRLNil :: SubrecordRL base Nil () () where
+  subrecordRL _ _ = identity
+
+instance subrecordRLCons ::
+         ( SubrecordRL base tl from from'
+         , IsSymbol k
+         , Row.Cons k v _b base
+         , Row.Cons k v from' to
+         , Row.Lacks k from'
+         ) => SubrecordRL base (Cons k v tl) from to where
+  subrecordRL base _ = hBuilder <<< tlBuilder
+    where
+      tlBuilder = subrecordRL base (RLProxy :: _ tl)
+      sp = SProxy :: _ k
+      v = Record.get sp base
+      hBuilder = Builder.insert (SProxy :: _ k) v
 
 class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
   parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|conn}
