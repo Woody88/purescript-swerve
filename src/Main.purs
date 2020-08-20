@@ -1,29 +1,45 @@
 module Main where
 
 import Prelude
+import Swerve.Server.Internal.Handler
 
+import Control.Monad.Except (ExceptT)
+import Control.Monad.Reader (ReaderT, ask, asks)
 import Effect (Effect)
--- import Effect.Console (log)
--- import Network.Wai (Application)
--- import Network.Warp as Warp
--- import Swerve.API.Verb (Get)
--- import Swerve.Server.Internal (swerve)
--- import Swerve.Server.Internal.Handler (Handler(..))
--- import Type.Proxy (Proxy(..))
+import Swerve.API.Verb (Get)
+import Swerve.Server (swerve)
+import Type.Proxy (Proxy(..))
 
--- newtype User = User String 
+type  UserAPI = GetUser 
 
--- type MyAPI = GetUser
+type GetUser 
+    = Get "/hello/:id" (Capture { id :: Int })
 
--- type GetUser 
---   = Get "/user" 
---       (content :: User)
 
--- handler :: Handler GetUser User
--- handler = Handler $ pure $ User "hello"
+type UpdateShipById
+    = Get "/ship/:id/update?[imoNumber]&[name]" 
+        ( Capture { id :: Int }
+        )
 
--- app :: Application 
--- app = swerve (Proxy :: _ MyAPI) handler  
+type Server = UserAPI 
+
+getUser :: Handler GetUser String  
+getUser = do 
+    num <- asks _.capture.id
+    pure $ show num
+
+userAPI =  getUser 
+
+swerveTest = swerve (Proxy :: _ UserAPI) userAPI
+
+
+
+
+
+
+type Capture captures = (capture :: captures)
 
 main :: Effect Unit
 main = pure unit -- Warp.run 8000 app
+
+-- type Handler conn a = ReaderT conn (ExceptT String Effect) a  

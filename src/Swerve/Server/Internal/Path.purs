@@ -65,7 +65,7 @@ class ParseCaptureVar (h :: Symbol) (t :: Symbol) (var :: Path) (rest :: Symbol)
 -- Throw error message on trailing '/'
 instance aParseCaptureVar :: ParseCaptureVar "" a (CaptureVar "") ""
 else instance bParseCaptureVar :: ParseCaptureVar a "" (CaptureVar a) ""
-else instance dParseCaptureVar :: Fail (Text "Invalid path. Remove trailing '/' from your path!") => ParseCaptureVar a "/" (CaptureVar "") ""
+else instance dParseCaptureVar :: Fail (Text "Invalid path. Remove trailing '/' from your path!") => ParseCaptureVar a "/" (CaptureVar a) ""
 else instance eParseCaptureVar :: ParseCaptureVar "/" i (CaptureVar "") i
 else instance fParseCaptureVar :: ParseCaptureVar "?" i (CaptureVar "") i
 else instance gParseCaptureVar ::

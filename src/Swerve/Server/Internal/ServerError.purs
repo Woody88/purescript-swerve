@@ -13,9 +13,9 @@ newtype ServerError
 -- derive newtype instance showServerError :: Show ServerError
 -- derive newtype instance eqServerError :: Eq ServerError
 
--- err500 :: ServerError
--- err500 = ServerError { errHTTPCode: 500
---                      , errReasonPhrase: "Internal Server Error"
---                      , errBody: ""
---                      , errHeaders: []
---                      }
+err500 :: ServerError
+err500 = ServerError { errHTTPCode: 500
+                     , errReasonPhrase: "Internal Server Error"
+                     , errBody: ""
+                     , errHeaders: []
+                     }

@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Monad.Except (ExceptT(..), runExceptT)
-import Control.Monad.Reader (runReaderT)
+import Control.Monad.Reader (ReaderT(..), runReaderT)
 import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
@@ -12,7 +12,10 @@ import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
+import Effect (Effect)
 import Effect.Aff (Aff)
+import Effect.Class (liftEffect)
+import Effect.Exception (throw)
 import Network.HTTP.Types (ok200)
 import Network.Wai (Application, Request(..), responseStr)
 import Network.Warp (pathInfo)
@@ -26,16 +29,19 @@ import Record.Builder (Builder)
 import Record.Builder as Builder
 import Record.Builder as Builder
 import Swerve.API.Verb (GET, Verb)
-import Swerve.Server.Internal.Handler (Handler'(..), Handler)
-import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PPath(..), PProxy(..), Segment, kind PList, kind Path)
+import Swerve.Server.Internal.Handler 
+import Swerve.Server.Internal.Path (class Parse, class ParseCaptureVar, CaptureVar, PCons, PNil, PPath(..), PProxy(..), Segment, kind PList, kind Path)
+import Swerve.Server.Internal.ServerError (ServerError(..), err500)
+import Swerver.Server.Internal.Conn (class Conn, class HasConn)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 import URI.Extra.QueryPairs (valueFromString)
+import Unsafe.Coerce (unsafeCoerce)
 
-type ConnectionRow cap 
+type ConnectionRow cap qry
   = ( capture :: Record cap
-    -- , query   :: Record qry
+    , query   :: Record qry
     )
 
 class ReadCapture a where 
@@ -47,60 +53,144 @@ instance readCaptureString :: ReadCapture String where
 instance readCaptureInt :: ReadCapture Int where 
   readCapture = Int.fromString
 
-class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) where 
-  parseRoute :: SProxy url -> RProxy specs -> String -> Either String { | conn }
+class Server layout handler | layout -> handler  
 
-instance parseRouteImpl :: 
-  ( Parse url xs 
-  , RowToList specs specsrl 
-  , ParsePath xs specsrl (ConnectionRow ()) conn
-  ) => ParseRoute url specs conn where 
-  parseRoute _ _ url = flip Builder.build {capture: {}} <$> parsePath (PProxy :: _ xs) (RLProxy :: _ specsrl) url url 
+instance serverRE :: Server (Verb GET path specs) (ReaderT { | conn } (ExceptT String Effect) a)
 
-class ParsePath (xs :: PList) (specs :: RowList) (from :: # Type) (to :: # Type)  | xs -> from to where
-  parsePath :: PProxy xs -> RLProxy specs -> String -> String -> Either String (Builder { | from } { | to })
+class HasServer layout handler | layout -> handler, handler -> layout where 
+  route :: Proxy layout -> handler -> String -> Effect String 
 
-instance parsePathNil :: ParsePath PNil specs to to where
-  parsePath _ _ _ _ = pure identity 
+instance hasVerb :: 
+  ( ParseRoute path specs params 
+  , Conn (Verb GET path specs) params
+  , Show a 
+  ) => HasServer (Verb GET path specs) (Handler (Verb GET path specs) a)  where 
+  route specP (Handler handler) url = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) url of 
+    Left e     -> throw e 
+    Right params -> do 
+      eHandler <- runExceptT $ runReaderT handler (toParams specP params)
+      case eHandler of 
+        Left e2 -> throw e2
+        Right str -> pure $ show str
 
-instance parseCapture :: 
+class SubRecord (base :: # Type) (sub :: # Type) (conn :: # Type) | base conn -> sub where
+  subrecord :: {|base} -> {|conn}
+
+instance subrecordI ::
+  ( RowToList sub rl
+  , SubRecordRL base rl () conn
+  ) => SubRecord base sub conn where
+  subrecord base =
+    Builder.build (subrecordRL base (RLProxy :: _ rl)) {}
+
+class SubRecordRL (base :: # Type) (rl :: RowList) (from :: # Type) (to :: # Type) | rl -> from to where
+  subrecordRL :: {|base} -> RLProxy rl -> Builder {|from} {|to}
+
+instance subrecordRLNil :: SubRecordRL base RL.Nil () () where
+  subrecordRL _ _ = identity
+
+instance subrecordRLCons ::
+         ( SubRecordRL base tl from from'
+         , IsSymbol k
+         , Symbol.Append "capture" "" k
+         , Row.Cons k v _b base
+         , Row.Cons k v from' to
+         , Row.Lacks k from'
+         ) => SubRecordRL base (RL.Cons k v tl) from to where
+  subrecordRL base _ = hBuilder <<< tlBuilder
+    where
+      tlBuilder = subrecordRL base (RLProxy :: _ tl)
+      sp = SProxy :: _ k
+      v = Record.get sp base
+      hBuilder = Builder.insert (SProxy :: _ k) v
+
+class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) | specs -> conn where
+  parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|conn}
+
+instance parseRouteImpl ::
+  ( Parse url xs
+  , ParsePath xs specs () cap () qry
+  , SubRecord (ConnectionRow cap qry) specs conn
+  ) => ParseRoute url specs conn where
+  parseRoute _ _ url = subrecord <$> conn
+    where
+      bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url url
+
+      conn :: Either String {| ConnectionRow cap qry }
+      conn = bldrs <#> \b ->
+        { capture: Builder.build b.capture {}
+        , query: Builder.build b.query {}
+        }
+
+class ParsePath 
+  (xs :: PList) (specs :: # Type) 
+  (cfrom :: # Type) (cto :: # Type) 
+  (qfrom :: # Type) (qto :: # Type) 
+  |xs -> cfrom cto qfrom qto where
+  parsePath :: 
+    PProxy xs 
+    -> RProxy specs 
+    -> String 
+    -> String 
+    -> Either String { capture :: Builder {| cfrom } {| cto }
+                     , query   :: Builder {| qfrom } {| qto }
+                     }
+
+class ParseCapture (var :: Symbol) (specs :: # Type) (cfrom :: # Type) (cto :: # Type) | var specs -> cfrom cto where 
+  parseCapture :: SProxy var -> RProxy specs -> String -> Either String (Builder { | cfrom } { | cto })
+
+instance parseCaptureImpl :: 
   ( IsSymbol var
-  , IsSymbol capture
-  , Symbol.Cons h t capture
-  , Symbol.Cons h t "capture"
-  , Row.Cons var vtype ctail ctype 
-  , Row.Cons var vtype from' to
-  , ReadCapture vtype
-  , Row.Lacks var ctail
-  , Row.Cons capture { | ctype } from' to
-  , Row.Cons capture { | ctail } from' from'    
-  , ParsePath tail spcstl from from'
-  ) => ParsePath (PCons (CaptureVar var) tail) (RL.Cons capture { | ctype} spcstl) from to where
+  , Row.Cons var vtype r specs
+  , ReadCapture vtype 
+  , Row.Cons var vtype cfrom cto
+  , Row.Lacks var cfrom
+  ) => ParseCapture var specs cfrom cto where 
+  parseCapture _ _ val = do 
+    case readCapture val of 
+      Nothing -> Left "capture could not be parsed."
+      Just (v :: vtype) -> do 
+        let cBuilder = Builder.insert (SProxy :: _ var) v 
+        pure cBuilder 
+  
+instance parsePathNil :: ParsePath PNil specs cto cto qto qto where
+  parsePath _ _ _ _ =
+    Right { capture: identity
+          , query: identity
+          }
+
+instance parsePathCapture ::
+  ( IsSymbol var
+  , Row.Cons "capture" { | cspcs } _spcs spcs
+  , ParseCapture var cspcs cfrom' cto 
+  , ParsePath tail spcs cfrom cfrom' qfrom qto
+  ) => ParsePath (PCons (CaptureVar var) tail) spcs cfrom cto qfrom qto where
   parsePath _ specs url url' = do
     let { after, before } = String.splitAt 1 url 
         (Tuple var tail)  = case flip String.splitAt after <$> readIndex after of 
-                              Nothing                -> (Tuple after "")
+                              Nothing                               -> (Tuple after "")
                               Just {after: after', before: before'} -> Tuple before' after'
-    case readCapture var of 
-      Nothing -> Left "capture could not be parsed."
-      Just (v :: vtype) -> do 
-        rest <- parsePath (PProxy :: _ tail) (RLProxy :: _ spcstl) tail url'
-        let x = Builder.modify captureP (\r ->  Record.insert varP v r)
-        pure $ x <<< rest
+
+    capture  <- parseCapture varP (RProxy :: RProxy cspcs) var
+    conn     <- parsePath (PProxy :: _ tail) (RProxy :: _ spcs) tail url'
+
+    pure $ { capture: capture <<< conn.capture
+           , query: conn.query
+           }
     where
       readIndex u = String.indexOf (Pattern "/") u <|> String.indexOf (Pattern "?") u
-      captureP = (SProxy :: _ capture)
       varP = (SProxy :: _ var)
+      captureP = SProxy :: SProxy "capture"
 
-instance parseSegmentRoot :: ParsePath tail specs from to => ParsePath (PCons (Segment "") tail) specs from to where 
+instance parseSegmentRoot :: ParsePath tail specs cfrom cto qfrom qto => ParsePath (PCons (Segment "") tail) specs cfrom cto qfrom qto where 
   parsePath _ specs url url' 
     | Just tail <- String.stripPrefix (Pattern "/") url = parsePath (PProxy :: _ tail) specs url url'
     | otherwise = Left $ "could not parse root from '" <> url' <> "'" 
 
 else instance parseSegment :: 
   ( IsSymbol seg 
-  , ParsePath tail specs from to
-  ) => ParsePath (PCons (Segment seg) tail) specs from to where 
+  , ParsePath tail specs cfrom cto qfrom qto
+  ) => ParsePath (PCons (Segment seg) tail) specs cfrom cto qfrom qto where 
   parsePath _ specs url url' = do
     let { after, before } = String.splitAt 1 url 
     case String.stripPrefix (Pattern segment) after of  

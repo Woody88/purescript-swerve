@@ -1,6 +1,10 @@
 module Swerve.Server where
 
-import Prelude 
+import Prelude
+
+import Effect (Effect)
+import Swerve.Server.Internal (class HasServer, route)
+import Type.Proxy (Proxy(..))
 
 -- import Network.Wai (Application)
 -- import Prim.RowList as RL
@@ -17,3 +21,8 @@ import Prelude
 --   -> Application
 -- swerve api handlers = toApplication $ matchRoutesImpl (RLProxy :: RLProxy apiL) (RProxy :: RProxy api) handlers 
 
+swerve :: forall layout handler. 
+  HasServer layout handler 
+  => Proxy layout -> handler -> String -> Effect String
+swerve p h xs = route p h xs
+  
