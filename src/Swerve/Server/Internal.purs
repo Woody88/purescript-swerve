@@ -55,16 +55,16 @@ instance readCaptureInt :: ReadCapture Int where
 
 class Server layout handler | layout -> handler  
 
-instance serverRE :: Server (Verb GET path specs) (ReaderT { | conn } (ExceptT String Effect) a)
+instance serverRE :: Server (Verb GET status path specs) (ReaderT { | conn } (ExceptT String Effect) a)
 
 class HasServer layout handler | layout -> handler, handler -> layout where 
   route :: Proxy layout -> handler -> String -> Effect String 
 
 instance hasVerb :: 
   ( ParseRoute path specs params 
-  , Conn (Verb GET path specs) params
+  , Conn (Verb GET status path specs) params
   , Show a 
-  ) => HasServer (Verb GET path specs) (Handler (Verb GET path specs) a)  where 
+  ) => HasServer (Verb GET status path specs) (Handler (Verb GET status path specs) a)  where 
   route specP (Handler handler) url = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) url of 
     Left e     -> throw e 
     Right params -> do 

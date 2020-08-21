@@ -1,10 +1,8 @@
 module Swerve.Server where
 
-import Prelude
-
 import Effect (Effect)
 import Swerve.Server.Internal (class HasServer, route)
-import Type.Proxy (Proxy(..))
+import Type.Proxy (Proxy)
 
 -- import Network.Wai (Application)
 -- import Prim.RowList as RL

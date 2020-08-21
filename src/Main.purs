@@ -1,10 +1,8 @@
 module Main where
 
 import Prelude
-import Swerve.Server.Internal.Handler
-
-import Control.Monad.Except (ExceptT)
-import Control.Monad.Reader (ReaderT, ask, asks)
+import Swerve.Server.Internal.Handler (Handler)
+import Control.Monad.Reader (asks)
 import Effect (Effect)
 import Swerve.API.Verb (Get)
 import Swerve.Server (swerve)
