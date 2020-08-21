@@ -18,8 +18,8 @@ import Type.Proxy (Proxy(..))
 type UserAPI = GetUser
 
 type GetUser 
-    = GetNoContent "/user/:id/hello/:name" 
-        ( Capture { id :: Int, name :: String }
+    = GetNoContent "/user/:id" 
+        ( Capture { id :: Int }
         )
 
 getUser :: Handler GetUser NoContent  
