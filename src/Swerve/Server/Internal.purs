@@ -2,16 +2,21 @@ module Swerve.Server.Internal where
 
 import Prelude
 
-import Control.Monad.Except (runExceptT)
+import Control.Monad.Except (runExceptT, throwError)
 import Control.Monad.Reader (runReaderT)
 import Data.Either (Either(..))
+import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
 import Effect.Exception (throw)
+import Network.HTTP.Types (internalServerError500, noContent204)
+import Network.Wai (Application, responseStr)
+import Swerve.API.ContentTypes (NoContent(..))
+import Swerve.API.StatusCode (S204)
 import Swerve.API.Verb (GET, Verb)
-import Swerver.Server.Internal.Conn (class Conn)
-import Swerve.Server.Internal.Handler (Handler(..), toParams)
 import Swerve.Internal.ParseRoute (class ParseRoute, parseRoute)
+import Swerve.Server.Internal.Handler (Handler(..), toParams)
+import Swerver.Server.Internal.Conn (class Conn)
 import Type.Data.Row (RProxy(..))
 import Type.Proxy (Proxy)
 
@@ -21,20 +26,32 @@ type ConnectionRow cap qry
     )
 
 class HasServer layout handler | layout -> handler, handler -> layout where 
-  route :: Proxy layout -> handler -> String -> Effect String 
+  route :: Proxy layout -> handler -> Application 
 
 instance hasVerb :: 
   ( ParseRoute path specs params 
-  , Conn (Verb GET status path specs) params
-  , Show a 
-  ) => HasServer (Verb GET status path specs) (Handler (Verb GET status path specs) a)  where 
-  route specP (Handler handler) url = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) url of 
-    Left e     -> throw e 
+  , Conn (Verb method S204 path specs) params
+  ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
+  route specP (Handler handler) req resp = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req)  of 
+    Left e     -> resp $ responseStr internalServerError500 [] mempty
     Right params -> do 
       eHandler <- runExceptT $ runReaderT handler (toParams specP params)
       case eHandler of 
-        Left e2 -> throw e2
-        Right str -> pure $ show str
+        Left e2 -> resp $ responseStr internalServerError500 [] mempty
+        Right str -> resp $ responseStr noContent204 [] mempty
+
+-- instance hasVerb :: 
+--   ( ParseRoute path specs params 
+--   , Conn (Verb GET status path specs) params
+--   , Show a 
+--   ) => HasServer (Verb GET status path specs) (Handler (Verb GET status path specs) a)  where 
+--   route specP (Handler handler) url req resp = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) url of 
+--     Left e     -> throw e 
+--     Right params -> do 
+--       eHandler <- runExceptT $ runReaderT handler (toParams specP params)
+--       case eHandler of 
+--         Left e2 -> throw e2
+--         Right str -> pure $ show str
 
 
 

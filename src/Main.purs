@@ -1,43 +1,38 @@
 module Main where
 
 import Prelude
-import Swerve.Server.Internal.Handler (Handler)
+
 import Control.Monad.Reader (asks)
 import Effect (Effect)
-import Swerve.API.Verb (Get)
+import Effect.Class.Console as Console
+import Network.Wai (Application)
+import Network.Warp.Run (runSettings)
+import Network.Warp.Settings (defaultSettings)
+import Swerve.API.ContentTypes (NoContent(..))
+import Swerve.API.Spec (Capture)
+import Swerve.API.Verb (GetNoContent)
 import Swerve.Server (swerve)
+import Swerve.Server.Internal.Handler (Handler)
 import Type.Proxy (Proxy(..))
 
-type  UserAPI = GetUser 
+type UserAPI = GetUser
 
 type GetUser 
-    = Get "/hello/:id" (Capture { id :: Int })
-
-
-type UpdateShipById
-    = Get "/ship/:id/update?[imoNumber]&[name]" 
-        ( Capture { id :: Int }
+    = GetNoContent "/user/:id/hello/:name" 
+        ( Capture { id :: Int, name :: String }
         )
 
-type Server = UserAPI 
-
-getUser :: Handler GetUser String  
+getUser :: Handler GetUser NoContent  
 getUser = do 
     num <- asks _.capture.id
-    pure $ show num
+    pure NoContent
 
-userAPI =  getUser 
+server = getUser
 
-swerveTest = swerve (Proxy :: _ UserAPI) userAPI
-
-
-
-
-
-
-type Capture captures = (capture :: captures)
+api :: Application
+api = swerve (Proxy :: _ UserAPI) server
 
 main :: Effect Unit
-main = pure unit -- Warp.run 8000 app
-
--- type Handler conn a = ReaderT conn (ExceptT String Effect) a  
+main = do 
+    let beforeMainLoop = Console.log $ "Listening on port " <> show defaultSettings.port
+    void $ runSettings defaultSettings { beforeMainLoop = beforeMainLoop } api
