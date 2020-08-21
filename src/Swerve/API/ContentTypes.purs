@@ -1,6 +1,5 @@
 module Swerve.API.ContentTypes where 
 
-import Network.HTTP.Media
 import Prelude
 
 import Data.Array as Array
@@ -8,13 +7,11 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.FormURLEncoded (FormURLEncoded)
 import Data.FormURLEncoded (encode) as FormURLEncoded
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Foreign as Foreign
 import Network.HTTP.Media as Media
-import Prim.RowList as RL
+import Network.HTTP.Media (MediaType, (//))
 import Prim.TypeError as TE
 import Simple.JSON as Json
 import Swerve.API.Combinators (type (:<|>))
@@ -26,9 +23,6 @@ data FormUrlEncoded
 data OctetStream 
 
 data NoContent = NoContent
-
-type Accept a r = ("accept" :: a | r)
-type ContentType a r = ("content-type" :: a | r)
 
 newtype AcceptHeader = AcceptHeader String 
 
