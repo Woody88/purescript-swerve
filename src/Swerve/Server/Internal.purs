@@ -8,6 +8,7 @@ import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Effect (Effect)
+import Effect.Class.Console as Console
 import Effect.Exception (throw)
 import Network.HTTP.Types (internalServerError500, noContent204)
 import Network.Wai (Application, responseStr)
@@ -33,7 +34,9 @@ instance hasVerb ::
   , Conn (Verb method S204 path specs) params
   ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
   route specP (Handler handler) req resp = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req)  of 
-    Left e     -> resp $ responseStr internalServerError500 [] mempty
+    Left e     -> do 
+      Console.logShow e
+      resp $ responseStr internalServerError500 [] mempty
     Right params -> do 
       eHandler <- runExceptT $ runReaderT handler (toParams specP params)
       case eHandler of 

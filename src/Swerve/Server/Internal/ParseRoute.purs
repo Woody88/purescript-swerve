@@ -3,8 +3,11 @@ module Swerve.Internal.ParseRoute where
 import Prelude
 
 import Control.Alt ((<|>))
+import Data.Array (mapMaybe)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.FoldableWithIndex (foldrWithIndex)
+import Data.Map as Map
+import Data.Maybe (Maybe(..), maybe)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
@@ -12,15 +15,16 @@ import Data.Tuple (Tuple(..))
 import Prim.Row as Row
 import Prim.RowList (class RowToList, kind RowList)
 import Prim.RowList as RL
-import Prim.Symbol as Symbol
 import Record as Record
 import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
-import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), Segment, kind PList)
+import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
+import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
 import Swerver.Server.Internal.Conn (ConnectionRow)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
+import Type.Proxy (Proxy(..))
 
 class SubRecord (base :: # Type) (sub :: # Type) (conn :: # Type) | base conn -> sub where
   subrecord :: {|base} -> {|conn}
@@ -41,7 +45,6 @@ instance subrecordRLNil :: SubRecordRL base RL.Nil () () where
 instance subrecordRLCons ::
          ( SubRecordRL base tl from from'
          , IsSymbol k
-         , Symbol.Append "capture" "" k
          , Row.Cons k v _b base
          , Row.Cons k v from' to
          , Row.Lacks k from'
@@ -53,7 +56,7 @@ instance subrecordRLCons ::
       v = Record.get sp base
       hBuilder = Builder.insert (SProxy :: _ k) v
 
-class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) | specs -> conn where
+class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
   parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|conn}
 
 instance parseRouteImpl ::
@@ -116,6 +119,39 @@ instance parsePathCapture ::
       readIndex u = String.indexOf (Pattern "/") u <|> String.indexOf (Pattern "?") u
       varP = (SProxy :: _ var)
       captureP = SProxy :: SProxy "capture"
+
+instance parsePathQuery ::
+  ( IsSymbol var
+  , Row.Cons "query" { | qspcs } _spcs spcs
+  , Row.Cons var vtype r qspcs
+  , ParseQuery var vtype qfrom' qto 
+  , ParsePath tail spcs cfrom cto qfrom qfrom'
+  ) => ParsePath (PCons (QueryVar var) tail) spcs cfrom cto qfrom qto where
+  parsePath _ specs url url' = do
+    
+    let { after, before } = String.splitAt 1 url 
+        queryMap = after
+                    # String.split (Pattern "&") 
+                    # mapMaybe (\d -> flip String.splitAt d <$> String.indexOf (Pattern "=") d)
+                    # map (\{after: v, before: k} -> Tuple k (String.drop 1 v))
+                    # Map.fromFoldable
+
+        (Tuple val tail) = case Map.pop (reflectSymbol $ varP) queryMap of 
+                            Just (Tuple v qmap) -> Tuple v (joinMap qmap)
+                            Nothing             -> Tuple "" (joinMap queryMap)
+            
+    query  <- parseQuery varP (Proxy :: Proxy vtype) val
+    conn   <- parsePath (PProxy :: _ tail) (RProxy :: _ spcs) tail url'
+
+    pure $ { query: query <<< conn.query
+           , capture: conn.capture
+           }
+    where
+      joinMap = foldrWithIndex (\k v  b -> "&" <> k <> "=" <> v <> b) ""
+      readIndex u  = String.indexOf (Pattern "&") u 
+      queryValue q = String.drop 1 <<<  maybe "" _.after <<< map (flip String.splitAt q) $ String.indexOf (Pattern "=") q
+      varP = (SProxy :: _ var)
+      captureP = SProxy :: SProxy "query"
 
 instance parseSegmentRoot :: ParsePath tail specs cfrom cto qfrom qto => ParsePath (PCons (Segment "") tail) specs cfrom cto qfrom qto where 
   parsePath _ specs url url' 

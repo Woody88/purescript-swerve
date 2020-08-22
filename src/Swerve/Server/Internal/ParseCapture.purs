@@ -1,23 +1,15 @@
 module Swerve.Server.Internal.ParseCapture where
 
--- Credits to @justinwoo for this module
-
 import Prelude
 
 import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
-import Data.String (Pattern(..))
-import Data.String (indexOf, splitAt, stripPrefix) as String
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Global as Global
+import Data.Symbol (class IsSymbol, SProxy(..))
 import Prim.Row as Row
-import Prim.Symbol as Symbol
-import Prim.TypeError as TE
 import Record.Builder (Builder)
 import Record.Builder as Builder
-import Record.Format (class Parse, FCons, FNil, FProxy(..), Lit, Var, kind FList)
-import Type.Data.Row (RProxy(..))
+import Type.Data.Row (RProxy)
 
 class ReadCapture a where 
   readCapture :: String -> Maybe a 

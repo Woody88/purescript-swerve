@@ -1,9 +1,9 @@
 module Swerve.API.Spec where 
 
 
-type Capture record = (capture :: record)
+type Capture record r = (capture :: record | r)
 
-type Query record = (query :: record)
+type Query record r = (query :: record | r)
 
 type Header record = (header :: record)
 
