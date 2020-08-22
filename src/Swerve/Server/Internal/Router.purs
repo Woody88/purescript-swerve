@@ -1,17 +1,20 @@
-module Swerve.Internal.ParseRoute where
+module Swerve.Internal.Router where
 
 import Prelude
 
 import Control.Alt ((<|>))
+import Control.Monad.Except (ExceptT, except, throwError)
 import Data.Array (mapMaybe)
-import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldrWithIndex)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (unwrap)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (Tuple(..))
+import Effect.Aff (Aff)
+import Network.Wai (Request)
 import Prim.Row as Row
 import Prim.RowList (class RowToList, kind RowList)
 import Prim.RowList as RL
@@ -56,19 +59,19 @@ instance subrecordRLCons ::
       v = Record.get sp base
       hBuilder = Builder.insert (SProxy :: _ k) v
 
-class ParseRoute (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
-  parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|conn}
+class Router (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
+  router :: SProxy url -> RProxy specs -> String -> Request -> ExceptT String Aff {|conn}
 
-instance parseRouteImpl ::
+instance routerImpl ::
   ( Parse url xs
   , ParsePath xs specs () cap () qry
   , SubRecord (ConnectionRow cap qry) specs conn
-  ) => ParseRoute url specs conn where
-  parseRoute _ _ url = subrecord <$> conn
+  ) => Router url specs conn where
+  router _ _ url req = subrecord <$> conn
     where
-      bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url url
+      bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
 
-      conn :: Either String {| ConnectionRow cap qry }
+      conn :: ExceptT String Aff {| ConnectionRow cap qry }
       conn = bldrs <#> \b ->
         { capture: Builder.build b.capture {}
         , query: Builder.build b.query {}
@@ -83,12 +86,10 @@ class ParsePath
     PProxy xs 
     -> RProxy specs 
     -> String 
-    -> String 
-    -> Either String { capture :: Builder {| cfrom } {| cto }
-                     , query   :: Builder {| qfrom } {| qto }
-                     }
-
-
+    -> Request 
+    -> ExceptT String Aff { capture :: Builder {| cfrom } {| cto }
+                          , query   :: Builder {| qfrom } {| qto }
+                          }
   
 instance parsePathNil :: ParsePath PNil specs cto cto qto qto where
   parsePath _ _ _ _ =
@@ -109,7 +110,7 @@ instance parsePathCapture ::
                               Nothing                               -> (Tuple after "")
                               Just {after: after', before: before'} -> Tuple before' after'
 
-    capture  <- parseCapture varP (RProxy :: RProxy cspcs) var
+    capture  <- except $ parseCapture varP (RProxy :: RProxy cspcs) var
     conn     <- parsePath (PProxy :: _ tail) (RProxy :: _ spcs) tail url'
 
     pure $ { capture: capture <<< conn.capture
@@ -140,7 +141,7 @@ instance parsePathQuery ::
                             Just (Tuple v qmap) -> Tuple v (joinMap qmap)
                             Nothing             -> Tuple "" (joinMap queryMap)
             
-    query  <- parseQuery varP (Proxy :: Proxy vtype) val
+    query  <- except $ parseQuery varP (Proxy :: Proxy vtype) val
     conn   <- parsePath (PProxy :: _ tail) (RProxy :: _ spcs) tail url'
 
     pure $ { query: query <<< conn.query
@@ -154,18 +155,18 @@ instance parsePathQuery ::
       captureP = SProxy :: SProxy "query"
 
 instance parseSegmentRoot :: ParsePath tail specs cfrom cto qfrom qto => ParsePath (PCons (Segment "") tail) specs cfrom cto qfrom qto where 
-  parsePath _ specs url url' 
-    | Just tail <- String.stripPrefix (Pattern "/") url = parsePath (PProxy :: _ tail) specs url url'
-    | otherwise = Left $ "could not parse root from '" <> url' <> "'" 
+  parsePath _ specs url req 
+    | Just tail <- String.stripPrefix (Pattern "/") url = parsePath (PProxy :: _ tail) specs url req
+    | otherwise = throwError $ "could not parse root from '" <> (_.url $ unwrap req) <> "'" 
 
 else instance parseSegment :: 
   ( IsSymbol seg 
   , ParsePath tail specs cfrom cto qfrom qto
   ) => ParsePath (PCons (Segment seg) tail) specs cfrom cto qfrom qto where 
-  parsePath _ specs url url' = do
+  parsePath _ specs url req = do
     let { after, before } = String.splitAt 1 url 
     case String.stripPrefix (Pattern segment) after of  
-      Just tail -> parsePath (PProxy :: _ tail) specs tail url'
-      otherwise -> Left $ "could not parse segment '" <> segment <> "' from '" <> url' <> "'" 
+      Just tail -> parsePath (PProxy :: _ tail) specs tail req
+      otherwise -> throwError $ "could not parse segment '" <> segment <> "' from '" <> (_.url $ unwrap req) <> "'" 
     where 
       segment = reflectSymbol (SProxy :: _ seg)

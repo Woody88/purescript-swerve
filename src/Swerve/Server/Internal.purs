@@ -15,7 +15,7 @@ import Network.Wai (Application, responseStr)
 import Swerve.API.ContentTypes (NoContent(..))
 import Swerve.API.StatusCode (S204)
 import Swerve.API.Verb (GET, Verb)
-import Swerve.Internal.ParseRoute (class ParseRoute, parseRoute)
+import Swerve.Internal.Router (class Router, router)
 import Swerve.Server.Internal.Handler (Handler(..), toParams)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Data.Row (RProxy(..))
@@ -30,18 +30,20 @@ class HasServer layout handler | layout -> handler, handler -> layout where
   route :: Proxy layout -> handler -> Application 
 
 instance hasVerb :: 
-  ( ParseRoute path specs params 
+  ( Router path specs params 
   , Conn (Verb method S204 path specs) params
   ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
-  route specP (Handler handler) req resp = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req)  of 
-    Left e     -> do 
-      Console.logShow e
-      resp $ responseStr internalServerError500 [] mempty
-    Right params -> do 
-      eHandler <- runExceptT $ runReaderT handler (toParams specP params)
-      case eHandler of 
-        Left e2 -> resp $ responseStr internalServerError500 [] mempty
-        Right str -> resp $ responseStr noContent204 [] mempty
+  route specP (Handler handler) req resp = do 
+    matchedRoute <- runExceptT $ router (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req) req 
+    case matchedRoute of 
+      Left e     -> do 
+        Console.logShow e
+        resp $ responseStr internalServerError500 [] mempty
+      Right params -> do 
+        eHandler <- runExceptT $ runReaderT handler (toParams specP params)
+        case eHandler of 
+          Left e2 -> resp $ responseStr internalServerError500 [] mempty
+          Right str -> resp $ responseStr noContent204 [] mempty
 
 -- instance hasVerb :: 
 --   ( ParseRoute path specs params 
