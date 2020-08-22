@@ -5,7 +5,7 @@ type Capture record r = (capture :: record | r)
 
 type Query record r = (query :: record | r)
 
-type Header record = (header :: record)
+type Header record r = (header :: record | r)
 
 type ReqBody a atype = (reqBody :: a)
 

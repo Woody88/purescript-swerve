@@ -22,12 +22,18 @@ import Record as Record
 import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
+import Swerve.Server.Internal.ParseHeader (class ParseHeader, parseHeader)
 import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
 import Swerver.Server.Internal.Conn (ConnectionRow)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
+
+type ConnPath cap qry 
+  = ( capture :: Record cap 
+    , query   :: Record qry 
+    )
 
 class SubRecord (base :: # Type) (sub :: # Type) (conn :: # Type) | base conn -> sub where
   subrecord :: {|base} -> {|conn}
@@ -64,18 +70,58 @@ class Router (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> c
 
 instance routerImpl ::
   ( Parse url xs
-  , ParsePath xs specs () cap () qry
-  , SubRecord (ConnectionRow cap qry) specs conn
+  , RowToList specs spcl
+  , ParsePath xs specs () cap () qry 
+  , ParseConnSpec spcl () hdr 
+  , SubRecord (ConnectionRow cap qry hdr) specs conn
   ) => Router url specs conn where
-  router _ _ url req = subrecord <$> conn
+  router _ _ url req = subrecord <$> (conns <$> bldrs <*> bldrs2) 
     where
       bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
 
-      conn :: ExceptT String Aff {| ConnectionRow cap qry }
-      conn = bldrs <#> \b ->
-        { capture: Builder.build b.capture {}
-        , query: Builder.build b.query {}
+      bldrs2 = parseConnSpec (RLProxy :: _ spcl) req
+
+      conns p s =  
+        { capture: Builder.build p.capture {}
+        , query: Builder.build p.query {}
+        , header: Builder.build s.header {}
         }
+
+      
+      
+
+      -- conn :: ExceptT String Aff {| ConnPath cap qry }
+      -- conn = bldrs <#> \b ->
+      --   { capture: Builder.build b.capture {}
+      --   , query: Builder.build b.query {}
+      --   }
+
+class ParseConnSpec   
+  (specs :: RowList)
+  (hfrom :: # Type) (hto :: # Type) 
+  |specs -> hfrom hto where 
+  parseConnSpec :: 
+    RLProxy specs 
+    -> Request 
+    -> ExceptT String Aff { header :: Builder {| hfrom } {| hto } }
+
+
+
+instance parseConnSpecNil :: ParseConnSpec RL.Nil hto hto where 
+  parseConnSpec _ _ = pure { header: identity }
+
+instance parseConnSpecHeader ::
+  ( RowToList htypes hrl
+  , ParseHeader hrl hfrom' hto 
+  , ParseConnSpec tail hfrom hfrom'
+  ) => ParseConnSpec (RL.Cons "header" { | htypes } tail) hfrom hto where
+  parseConnSpec _ req = do
+    specs <- parseConnSpec (RLProxy :: _ tail) req 
+    hdr <- except $ parseHeader (RLProxy :: _ hrl) (_.headers $ unwrap req) 
+    pure $ { header: hdr <<< specs.header } 
+
+else instance parseConnSpecs :: ParseConnSpec tail hfrom hto  => ParseConnSpec (RL.Cons specs htype tail) hfrom hto where 
+  parseConnSpec _ req = parseConnSpec (RLProxy :: _ tail) req
 
 class ParsePath 
   (xs :: PList) (specs :: # Type) 

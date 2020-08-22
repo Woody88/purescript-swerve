@@ -4,9 +4,10 @@ import Prim.RowList (kind RowList)
 import Prim.RowList as RL
 import Swerve.API.Verb (Verb)
 
-type ConnectionRow cap qry
+type ConnectionRow cap qry hdr
   = ( capture :: Record cap
     , query   :: Record qry
+    , header  :: Record hdr
     )
     
 class Conn specs (conn :: # Type) | specs -> conn 
@@ -21,3 +22,4 @@ instance conn ::
 instance hasConnNil :: HasConn RL.Nil conn
 else instance hasConnCapture :: HasConn tail rest => HasConn (RL.Cons "capture" ctype tail) (capture :: ctype | rest)
 else instance hasConnQuery   :: HasConn tail rest => HasConn (RL.Cons "query" ctype tail) (query :: ctype | rest)
+else instance hasConnHeader   :: HasConn tail rest => HasConn (RL.Cons "header" ctype tail) (header :: ctype | rest)
