@@ -21,5 +21,5 @@ instance conn ::
 
 instance hasConnNil :: HasConn RL.Nil conn
 else instance hasConnCapture :: HasConn tail rest => HasConn (RL.Cons "capture" ctype tail) (capture :: ctype | rest)
-else instance hasConnQuery   :: HasConn tail rest => HasConn (RL.Cons "query" ctype tail) (query :: ctype | rest)
-else instance hasConnHeader   :: HasConn tail rest => HasConn (RL.Cons "header" ctype tail) (header :: ctype | rest)
+else instance hasConnQuery   :: HasConn tail rest => HasConn (RL.Cons "query" qtype tail) (query :: qtype | rest)
+else instance hasConnHeader   :: HasConn tail rest => HasConn (RL.Cons "header" htype tail) (header :: htype | rest)
