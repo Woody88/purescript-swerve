@@ -34,9 +34,10 @@ import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
 import URI.Extra.QueryPairs (valueFromString)
 
-type ConnectionRow cap qry
+type ConnectionRow cap qry bdy
   = ( capture :: Record cap
     , query   :: Record qry
+    , body :: bdy
     )
 
 class ReadCapture a where
@@ -78,23 +79,62 @@ instance subrecordRLCons ::
       v = Record.get sp base
       hBuilder = Builder.insert (SProxy :: _ k) v
 
+class BodyParser p where
+  bodyParse :: String -> Either String p
+
+instance stringBodyParser :: BodyParser String where
+  bodyParse = Right
+
+class ParseBody (r :: # Type) b | r -> b where
+  parseBody :: RProxy r -> String -> Either String b
+
+instance parseBodyI ::
+  ( RowToList r rl
+  , ParseBodyRL rl b
+  ) => ParseBody r b where
+  parseBody _ = parseBodyRL (RLProxy :: _ rl)
+
+class ParseBodyRL (rl :: RowList) b | rl -> b where
+  parseBodyRL :: RLProxy rl -> String -> Either String b
+
+instance parseBodyRLNil :: ParseBodyRL Nil Unit where
+  parseBodyRL _ _ = Right unit
+
+instance parseBodyRLConsBody ::
+  ( BodyParser bdy
+  ) => ParseBodyRL (Cons "body" bdy tl) bdy where
+  parseBodyRL _ = bodyParse
+
+else instance parseBodyRLConsOther ::
+  ( ParseBodyRL tl bdy
+  ) => ParseBodyRL (Cons k v tl) bdy where
+  parseBodyRL _ = parseBodyRL (RLProxy :: _ tl)
+
 class ParseRoute (url :: Symbol) (specs :: # Type) where
   parseRoute :: SProxy url -> RProxy specs -> String -> Either String {|specs}
 
 instance parseRouteImpl ::
   ( Parse url xs
   , ParsePath xs specs () cap () qry
-  , Subrecord (ConnectionRow cap qry) specs
+  , ParseBody specs bdy
+  , Subrecord (ConnectionRow cap qry bdy) specs
   ) => ParseRoute url specs where
-  parseRoute _ _ url = subrecord <$> conn
-    where
-      bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url url
+  parseRoute _ rp url = subrecord <$> ado
+    { capture, query } <- conn'
+    body <- body'
+    in { capture, query, body }
 
-      conn :: Either String {|ConnectionRow cap qry}
-      conn = bldrs <#> \b ->
+    where
+      bldrs = parsePath (PProxy :: _ xs) rp url url
+
+      conn' :: Either String { capture :: {|cap}, query :: {|qry} }
+      conn' = bldrs <#> \b ->
         { capture: Builder.build b.capture {}
         , query: Builder.build b.query {}
         }
+
+      body' :: Either String bdy
+      body' = parseBody rp url -- should relly be body
 
 class ParsePath (xs :: PList) (specs :: # Type) (capfrom :: # Type) (capto :: # Type) (queryfrom :: # Type) (queryto :: # Type) | xs -> capfrom capto queryfrom queryto where
   parsePath :: PProxy xs -> RProxy specs -> String -> String -> Either String { capture :: Builder { | capfrom } { | capto }

@@ -49,3 +49,16 @@ capOnly =
   (SProxy :: _ "/:id")
   (RProxy :: _ (capture :: { id :: Int }))
   url
+
+capQueryBody :: Either String
+  { capture :: { id :: Int
+               }
+  , query :: { minAge :: Int
+             }
+  , body :: String
+  }
+capQueryBody =
+  parseRoute
+  (SProxy :: _ "/:id?[minAge]")
+  (RProxy :: _ (capture :: { id :: Int }, query :: { minAge :: Int }, body :: String))
+  url
