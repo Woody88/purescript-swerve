@@ -22,7 +22,6 @@ import Prim.RowList as RL
 import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.API.ContentTypes (class MimeUnrender, mimeUnrender)
-import Swerve.API.Spec (ReqBody'(..))
 import Swerve.Server.Internal.ParseHeader (class ParseHeader, parseHeader)
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
@@ -38,7 +37,6 @@ class ParseConnSpec
 
 instance parseConnSpecNil :: ParseConnSpec RL.Nil hto hto where 
   parseConnSpec _ req = pure { header: identity }
-
 
 instance parseConnSpecHeader ::
   ( RowToList htypes hrl

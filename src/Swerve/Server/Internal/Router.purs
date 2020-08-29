@@ -3,12 +3,13 @@ module Swerve.Internal.Router where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Monad.Except (ExceptT, except, throwError)
+import Control.Monad.Except (ExceptT(..), except, throwError)
 import Data.Array (mapMaybe)
+import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldrWithIndex)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
@@ -21,8 +22,13 @@ import Prim.RowList as RL
 import Record as Record
 import Record.Builder (Builder)
 import Record.Builder as Builder
+import Swerve.API.ContentTypes (PlainText, contentType)
+import Swerve.API.Spec (ReqBody'(..))
+import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
 import Swerve.Internal.ParseSpec (class ParseConnSpec, parseConnSpec)
+import Swerve.Server.Internal.ParseBody (class ParseBody, parseBody)
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
+import Swerve.Server.Internal.ParseMethod (methodCheck)
 import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
 import Swerver.Server.Internal.Conn (ConnectionRow)
@@ -65,17 +71,26 @@ instance subrecordRLCons ::
       v = Record.get sp base
       hBuilder = Builder.insert (SProxy :: _ k) v
 
-class Router (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
-  router :: SProxy url -> RProxy specs -> String -> Request -> ExceptT String Aff {|conn}
+class Router verb (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
+  router :: Proxy verb -> SProxy url -> RProxy specs -> String -> Request -> ExceptT String Aff {|conn}
 
 instance routerImpl ::
   ( Parse url xs
   , RowToList specs spcl
   , ParsePath xs specs () cap () qry 
   , ParseConnSpec spcl () hdr 
-  , SubRecord (ConnectionRow cap qry hdr) specs conn
-  ) => Router url specs conn where
-  router _ _ url req = subrecord <$> (conns <$> bldrs <*> bldrs2) 
+  , ParseBody specs bdy ctype
+  , SubRecord (ConnectionRow cap qry hdr bdy ctype) specs conn
+  , Row.Union conn attrs_ specs
+  , ReflectMethod method
+  ) => Router (Verb method status url specs) url specs conn where
+  router vp _ rp url req = do 
+    _ <- except $ methodCheck (reflectMethod (VerbP :: _ method)) req
+    { capture, query, header } <- conns <$> bldrs <*> bldrs2
+    (body :: bdy)  <- parseBody rp req 
+    let contentType =  Proxy :: _ ctype
+    pure $ subrecord { capture, query, header, body, contentType}
+      
     where
       bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
 

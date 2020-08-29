@@ -2,7 +2,7 @@ module Swerve.Server.Internal where
 
 import Prelude
 
-import Control.Monad.Except (runExceptT, throwError)
+import Control.Monad.Except (except, runExceptT, throwError)
 import Control.Monad.Reader (runReaderT)
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
@@ -14,9 +14,10 @@ import Network.HTTP.Types (internalServerError500, noContent204)
 import Network.Wai (Application, responseStr)
 import Swerve.API.ContentTypes (NoContent(..))
 import Swerve.API.StatusCode (S204)
-import Swerve.API.Verb (GET, POST, Verb)
+import Swerve.API.Verb (GET, Verb, VerbP(..), reflectMethod)
 import Swerve.Internal.Router (class Router, router)
 import Swerve.Server.Internal.Handler (Handler(..), toParams)
+import Swerve.Server.Internal.ParseMethod (methodCheck)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Data.Row (RProxy(..))
 import Type.Proxy (Proxy)
@@ -30,13 +31,13 @@ class HasServer layout handler | layout -> handler, handler -> layout where
   route :: Proxy layout -> handler -> Application 
 
 instance hasVerb :: 
-  ( Router path specs params 
+  ( Router (Verb method S204 path specs) path specs params 
   , Conn (Verb method S204 path specs) params
   ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
   route specP handler = noContentRouter specP handler (SProxy :: _ path) (RProxy :: _ specs) 
 
 noContentRouter :: forall path specs params method.
-  Router path specs params 
+  Router (Verb method S204 path specs) path specs params 
   => Conn (Verb method S204 path specs) params
   => Proxy (Verb method S204 path specs) 
   -> Handler (Verb method S204 path specs) NoContent
@@ -44,11 +45,10 @@ noContentRouter :: forall path specs params method.
   -> RProxy specs
   -> Application
 noContentRouter verbP (Handler handler) pathP specsP req resp = do 
-  matchedRoute <- runExceptT $ router pathP specsP (_.url $ unwrap req) req 
+  matchedRoute <- runExceptT $ router verbP pathP specsP (_.url $ unwrap req) req 
   case matchedRoute of 
-    Left e     -> do 
-      Console.logShow e
-      resp $ responseStr internalServerError500 [] mempty
+    Left e   -> do 
+      resp $ responseStr internalServerError500 [] e
     Right params -> do 
       eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
       case eHandler of 

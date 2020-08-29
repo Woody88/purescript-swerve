@@ -1,7 +1,6 @@
 module Swerve.API.Verb where
 
-import Network.HTTP.Types (Method)
-import Network.HTTP.Types.Method (methodConnect, methodDelete, methodGet, methodHead, methodOptions, methodPatch, methodPost, methodPut, methodTrace)
+import Network.HTTP.Types.Method (Method, methodConnect, methodDelete, methodGet, methodHead, methodOptions, methodPatch, methodPost, methodPut, methodTrace)
 import Swerve.API.StatusCode (S200, S201, S202, S203, S204, S205, S206, kind StatusCode)
 
 foreign import kind VERB

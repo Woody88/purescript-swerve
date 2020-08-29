@@ -22,7 +22,7 @@ data PlainText
 data FormUrlEncoded 
 data OctetStream 
 
-data NoContent = NoContent
+data NoContent = NoContent 
 
 newtype AcceptHeader = AcceptHeader String 
 
@@ -110,7 +110,7 @@ instance mimeUnrenderJson :: Json.ReadForeign a => MimeUnrender JSON a where
             renderError :: Foreign.MultipleErrors -> String 
             renderError = show <<< map Foreign.renderForeignError
 
-instance mimeUnrenderPlainText :: Show a => MimeUnrender PlainText String where 
-    mimeUnrender _ = Right <<< show 
+instance mimeUnrenderPlainText ::  MimeUnrender PlainText String where 
+    mimeUnrender _ x = Right x
 
 
