@@ -112,5 +112,3 @@ instance mimeUnrenderJson :: Json.ReadForeign a => MimeUnrender JSON a where
 
 instance mimeUnrenderPlainText ::  MimeUnrender PlainText String where 
     mimeUnrender _ x = Right x
-
-

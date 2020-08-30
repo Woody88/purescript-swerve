@@ -11,6 +11,7 @@ You can edit this file as you like.
   , "http-types"
   , "media-types"
   , "psci-support"
+  , "record-extra"
   , "record-format"
   , "simple-json"
   , "typelevel-prelude"

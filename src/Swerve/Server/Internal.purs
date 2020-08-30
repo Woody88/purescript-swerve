@@ -2,39 +2,143 @@ module Swerve.Server.Internal where
 
 import Prelude
 
-import Control.Monad.Except (except, runExceptT, throwError)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (runReaderT)
 import Data.Either (Either(..))
-import Data.Newtype (unwrap)
+import Data.Map as Map
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (unwrap, wrap)
+import Data.String.CaseInsensitive (CaseInsensitiveString(..))
 import Data.Symbol (SProxy(..))
-import Effect (Effect)
+import Data.Tuple (fst, snd)
+import Data.Tuple.Nested (type (/\), (/\))
+import Effect.Aff as Aff
+import Effect.Aff as Error
 import Effect.Class.Console as Console
-import Effect.Exception (throw)
-import Network.HTTP.Types (internalServerError500, noContent204)
-import Network.Wai (Application, responseStr)
-import Swerve.API.ContentTypes (NoContent(..))
-import Swerve.API.StatusCode (S204)
-import Swerve.API.Verb (GET, Verb, VerbP(..), reflectMethod)
+import Foreign.Object (Object)
+import Foreign.Object as Object
+import Network.HTTP.Types (hAccept, hContentType, internalServerError500, noContent204, notAcceptable406, ok200)
+import Network.Wai (Application, Request(..), responseStr)
+import Prim.RowList (class RowToList)
+import Record.Extra (class MapRecord, mapRecord)
+import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), NoContent, PlainText, handleAcceptH)
+import Swerve.API.Spec (Header'(..))
+import Swerve.API.StatusCode (S200, S204)
+import Swerve.API.Verb (Verb)
 import Swerve.Internal.Router (class Router, router)
 import Swerve.Server.Internal.Handler (Handler(..), toParams)
-import Swerve.Server.Internal.ParseMethod (methodCheck)
+import Swerve.Server.Internal.ParseBody (class ParseBodyCT, class ParseResource)
+import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Data.Row (RProxy(..))
-import Type.Proxy (Proxy)
-
-type ConnectionRow cap qry
-  = ( capture :: Record cap
-    , query   :: Record qry
-    )
+import Type.Proxy (Proxy(..))
+import Type.Row.Homogeneous as Row
 
 class HasServer layout handler | layout -> handler, handler -> layout where 
   route :: Proxy layout -> handler -> Application 
 
-instance hasVerb :: 
+instance hasVerbNoContent :: 
   ( Router (Verb method S204 path specs) path specs params 
   , Conn (Verb method S204 path specs) params
   ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
   route specP handler = noContentRouter specP handler (SProxy :: _ path) (RProxy :: _ specs) 
+else instance hasVerbHeaders ::
+  ( Router (Verb method S200 path specs) path specs params 
+  , RowToList specs spcrl 
+  , ParseResource spcrl resp ctype
+  , Row.Homogeneous hdrs' String 
+  , Row.HomogeneousRowList hdrl' String
+  , RowToList hdrs' hdrl' 
+  , RowToList hdrs hdrl  
+  , ToHeader a
+  , MapRecord hdrl hdrs a String () hdrs'
+  , AllCTRender ctype resp 
+  , Conn (Verb method S200 path specs) params
+  ) => HasServer (Verb method S200 path specs) (Handler (Verb method S200 path specs) (Header' { | hdrs}   resp))  where 
+  route specP handler = routerHeaders specP handler (SProxy :: _ path) (RProxy :: _ specs) 
+
+else instance hasVer :: 
+  ( Router (Verb method S200 path specs) path specs params 
+  , RowToList specs spcrl 
+  , ParseResource spcrl resp ctype
+  , AllCTRender ctype resp 
+  , Conn (Verb method S200 path specs) params
+  ) => HasServer (Verb method S200 path specs) (Handler (Verb method S200 path specs) resp)  where 
+  route specP handler = router' specP handler (SProxy :: _ path) (RProxy :: _ specs) 
+
+routerHeaders :: forall path specs params method resp spcrl hdrs hdrs' hdrl hdrl' a ctype.
+  Router (Verb method S200 path specs) path specs params 
+  => Conn (Verb method S200 path specs) params
+  => RowToList specs spcrl 
+  => ParseResource spcrl resp ctype
+  => Row.Homogeneous hdrs' String 
+  => Row.HomogeneousRowList hdrl' String
+  => RowToList hdrs' hdrl' 
+  => RowToList hdrs hdrl  
+  => ToHeader a
+  => MapRecord hdrl hdrs a String () hdrs'
+  => AllCTRender ctype resp 
+  => Proxy (Verb method S200 path specs) 
+  -> Handler (Verb method S200 path specs) (Header' { | hdrs } resp)
+  -> SProxy path 
+  -> RProxy specs
+  -> Application
+routerHeaders verbP (Handler handler) pathP specsP req resp = do 
+  matchedRoute <- runExceptT $ router verbP pathP specsP (_.url $ unwrap req) req 
+  case matchedRoute of 
+    Left e -> resp $ responseStr internalServerError500 [] mempty
+    Right params -> do
+      eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
+      case eHandler of 
+        Left e2 -> do 
+          resp $ responseStr internalServerError500 [] mempty
+        Right (Header' hdrs resource) -> do 
+          let accH = getAcceptHeader req
+              hdrs' = headersToUnfoldable hdrs
+          case handleAcceptH (Proxy :: _ ctype) accH resource of
+            Nothing -> do
+              resp $ responseStr notAcceptable406 [] notAcceptable406.message
+            Just (ct /\ body) -> do 
+              resp $ responseStr ok200  ([hContentType /\ ct] <> map (\t -> (wrap $ fst t) /\ snd t) hdrs') body
+
+headersToUnfoldable :: forall r r' rl rl' a.
+  Row.Homogeneous r' String 
+  => Row.HomogeneousRowList rl' String
+  => RowToList r' rl' 
+  => RowToList r rl  
+  => ToHeader a
+  => MapRecord rl r a String () r' 
+  => Record r 
+  -> Array (String /\ String)
+headersToUnfoldable = Object.toUnfoldable <<<  Object.fromHomogeneous <<< mapRecord (toHeader)
+
+router' :: forall path specs params method resp spcrl ctype.
+  Router (Verb method S200 path specs) path specs params 
+  => Conn (Verb method S200 path specs) params
+  => RowToList specs spcrl 
+  => ParseResource spcrl resp ctype
+  => AllCTRender ctype resp 
+  => Proxy (Verb method S200 path specs) 
+  -> Handler (Verb method S200 path specs) resp
+  -> SProxy path 
+  -> RProxy specs
+  -> Application
+router' verbP (Handler handler) pathP specsP req resp = do 
+  matchedRoute <- runExceptT $ router verbP pathP specsP (_.url $ unwrap req) req 
+  case matchedRoute of 
+    Left e -> resp $ responseStr internalServerError500 [] mempty
+    Right params -> do
+      eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
+      case eHandler of 
+        Left e2 -> do 
+          resp $ responseStr internalServerError500 [] mempty
+        Right resource -> do 
+          let accH = getAcceptHeader req
+          case handleAcceptH (Proxy :: _ ctype) accH resource of
+            Nothing -> do
+              resp $ responseStr notAcceptable406 [] notAcceptable406.message
+            Just (ct /\ body) -> do 
+              resp $ responseStr ok200  [hContentType /\ ct] body
 
 noContentRouter :: forall path specs params method.
   Router (Verb method S204 path specs) path specs params 
@@ -52,8 +156,15 @@ noContentRouter verbP (Handler handler) pathP specsP req resp = do
     Right params -> do 
       eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
       case eHandler of 
-        Left e2 -> resp $ responseStr internalServerError500 [] mempty
+        Left e2 -> do 
+          resp $ responseStr internalServerError500 [] mempty
         Right str -> resp $ responseStr noContent204 [] mempty
+
+getAcceptHeader :: Request -> AcceptHeader
+getAcceptHeader = AcceptHeader <<< fromMaybe ct_wildcard <<< Map.lookup hAccept <<< Map.fromFoldable <<< _.headers <<< unwrap
+
+ct_wildcard :: String
+ct_wildcard = "*" <> "/" <> "*"
 
 -- instance hasVerb :: 
 --   ( ParseRoute path specs params 
@@ -213,7 +324,3 @@ noContentRouter verbP (Handler handler) pathP specsP req resp = do
 --             acceptContent mCtype
 --                 | Just ctype <- mCtype = Right route 
 --                 | otherwise = Left "content type header not found"
-
-
--- ct_wildcard :: String
--- ct_wildcard = "*" <> "/" <> "*"

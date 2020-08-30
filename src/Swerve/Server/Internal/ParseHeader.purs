@@ -25,6 +25,15 @@ instance readHeaderString :: ReadHeader String where
 instance readHeaderInt :: ReadHeader Int where 
   readHeader = Int.fromString
 
+class ToHeader a where 
+  toHeader :: a -> String 
+
+instance toHeaderString :: ToHeader String where 
+  toHeader x = x 
+
+instance toHeaderInt :: ToHeader Int where 
+  toHeader = show
+
 class ParseHeader (hdrl :: RowList) (hfrom :: # Type) (hto :: # Type) | hdrl -> hfrom hto where 
   parseHeader :: RLProxy hdrl -> RequestHeaders -> Either String (Builder { | hfrom } { | hto })
 

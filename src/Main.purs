@@ -11,9 +11,9 @@ import Network.Wai (Application)
 import Network.Warp.Run (runSettings)
 import Network.Warp.Settings (defaultSettings)
 import Node.FS (FileFlags(..))
-import Swerve.API.ContentTypes (NoContent(..), PlainText)
-import Swerve.API.Spec (Capture, Header, Query, ReqBody, ReqBody'(..), ContentType)
-import Swerve.API.Verb (GetNoContent, PostNoContent)
+import Swerve.API.ContentTypes (JSON, NoContent(..), PlainText)
+import Swerve.API.Spec (Capture, ContentType, Header, Header'(..), Query, ReqBody, ReqBody'(..), Resource, withHeader)
+import Swerve.API.Verb (GetNoContent, PostNoContent, Post)
 import Swerve.Server (swerve)
 import Swerve.Server.Internal.Handler (Handler)
 import Type.Proxy (Proxy(..))
@@ -21,19 +21,26 @@ import Type.Row (type (+))
 
 type UserAPI = GetUser
 
+type HelloWorld = { hello :: String }
+
 type GetUser 
-    = PostNoContent "/user/:id?[maxAge]&[minAge]" 
+    = Post "/user/:id?[maxAge]&[minAge]" 
         ( Capture { id :: Int }
         + Query { maxAge :: Maybe Int, minAge :: Maybe Int } 
-        -- + ReqBody String PlainText
+        + Header { accept :: String }
+        + ReqBody String PlainText
+        + Resource (Header' { hello :: String } HelloWorld) JSON
         + ()
         )
 
-getUser :: Handler GetUser NoContent  
-getUser = do  
-    pure NoContent
+postUser :: Handler GetUser (Header' { hello :: String } HelloWorld) 
+postUser = do 
+    accept <- asks $ _.header.accept
+    Console.log accept
+    withHeader { hello: "world!" } { hello: "World!" }
 
-server = getUser
+server :: _
+server = postUser
 
 api :: Application
 api = swerve (Proxy :: _ UserAPI) server
