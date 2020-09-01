@@ -1,63 +1,98 @@
 module Swerve.Server.Internal.Response where
 
--- import Prelude
--- import Swerve.API.ContentTypes
+import Prelude
 
--- import Data.Either (Either(..))
--- import Data.Map as Map
--- import Data.Maybe (Maybe(..), fromMaybe)
--- import Data.String as String
--- import Data.Tuple (fst, snd)
--- import Data.Tuple.Nested ((/\))
--- import Effect (Effect)
--- import Effect.Aff (makeAff)
--- import Effect.Exception (throw)
--- import Network.HTTP.Types (hAccept, hContentType, status200, status400, status500)
--- import Network.Wai (Request(..), Response)
--- import Prim.Row as Row
--- import Prim.RowList as RL
--- import Simple.JSON (class WriteForeign, writeJSON)
--- import Swerve.API.MediaType (JSON)
--- import Swerve.API.RequestMethod (GetRequest)
--- import Swerve.Server.Internal.Handler (Handler, runHandler)
--- import Swerve.Server.Internal.Route (Route)
--- import Type.Data.Row (RProxy)
--- import Type.Data.RowList (RLProxy(..))
--- import Type.Proxy (Proxy(..))
+import Control.Monad.Except (ExceptT, throwError)
+import Control.Monad.Reader (runReaderT)
+import Data.Array ((:))
+import Data.Map as Map
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (unwrap, wrap)
+import Data.String.CaseInsensitive (CaseInsensitiveString(..))
+import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple.Nested (type (/\), (/\))
+import Effect.Aff (Aff)
+import Foreign.Object as Object
+import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
+import Network.HTTP.Types (ResponseHeaders, hAccept, hContentType, notAcceptable406)
+import Network.Wai (Request, Response, responseStr)
+import Prim.RowList (class RowToList)
+import Record.Extra (class MapRecord, mapRecord)
+import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), handleAcceptH)
+import Swerve.API.Spec (Header'(..))
+import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
+import Swerve.API.Verb (Verb)
+import Swerve.Server.Internal.Handler (Handler(..), toParams)
+import Swerve.Server.Internal.ParseBody (class ParseResource)
+import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
+import Swerver.Server.Internal.Conn (class Conn)
+import Type.Equality (class TypeEquals)
+import Type.Proxy (Proxy(..))
+import Type.Row.Homogeneous as Row
 
--- class HasResponse route handler | route -> handler where 
---     toResponse :: Proxy route -> handler -> Effect Response
+class HasResponse handler params where 
+  runHandler :: { | params } -> handler -> Request -> ExceptT String Aff Response
 
--- instance hasResponseGet :: 
---     ( WriteForeign resp 
---     ) => HasResponse (Route url GetRequest bdy resp JSON props) (Handler route resp) where
---     toResponse _ handle = do 
---         let headers = [ hContentType /\ "application/json" ]
---         resp <- runHandler handle
---         case resp of 
---             Left l -> pure $ responseStr status500 headers (writeJSON status500)
---             Right (r :: resp) -> pure $ responseStr status200 headers (writeJSON r)
+instance hasResponseHeader ::
+  ( Conn (Verb method status path specs) params
+  , RowToList specs spcrl 
+  , ParseResource spcrl resp ctype
+  , AllCTRender ctype resp 
+  , HasStatus status
+  , HFoldlWithIndex HeadersUnfold Unit { | hdrs } (Array (Tuple CaseInsensitiveString String))
+  ) => HasResponse (Handler (Verb method status path specs) (Header' { | hdrs}   resp)) params where 
+  runHandler params (Handler handler) req = do
+    let verbP = Proxy :: _ (Verb method status path specs)
+    (Header' hdrs resource) <- runReaderT handler (toParams verbP params)
+    let accH = getAcceptHeader req
+        hdrs' = headersToUnfoldable' hdrs
+    case handleAcceptH (Proxy :: _ ctype) accH resource of
+      Nothing -> do
+        throwError notAcceptable406.message
+      Just (ct /\ body) -> do 
+        pure $ responseStr (toStatus (StatusP :: _ status)) ((hContentType /\ ct) : hdrs') body
 
+else instance hasResponse :: 
+  ( Conn (Verb method status path specs) params
+  , RowToList specs spcrl 
+  , ParseResource spcrl resp ctype
+  , AllCTRender ctype resp 
+  , HasStatus status
+  ) => HasResponse (Handler (Verb method status path specs) resp) params where 
+  runHandler params (Handler handler) req = do
+    let verbP = Proxy :: _ (Verb method status path specs)
+    resource <- runReaderT handler (toParams verbP params)
+    let accH = getAcceptHeader req
+    case handleAcceptH (Proxy :: _ ctype) accH resource of
+      Nothing -> do
+        throwError notAcceptable406.message
+        -- resp $ responseStr notAcceptable406 [] notAcceptable406.message
+      Just (ct /\ body) -> do 
+        pure $ responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
 
--- class HasResponse' route handler (specs :: RL.RowList) | route -> handler where 
---     toResponse' :: RLProxy specs -> Proxy route -> Request -> handler -> Effect Response
+getAcceptHeader :: Request -> AcceptHeader
+getAcceptHeader = AcceptHeader <<< fromMaybe ct_wildcard <<< Map.lookup hAccept <<< Map.fromFoldable <<< _.headers <<< unwrap
 
--- instance hasResponse :: 
---     ( AllCTRender ctype resp
---     ) => HasResponse' (Route url method bdy resp ct props) (Handler route resp) (RL.Cons "accept" ctype tail) where
---     toResponse' pspecs _ (Request req) handle = do 
---         let 
---             lookupHeader = flip Map.lookup $ Map.fromFoldable req.requestHeaders 
---             mCtHeader = AcceptHeader $ fromMaybe "*/*" $ lookupHeader $ String.toLower hAccept
+ct_wildcard :: String
+ct_wildcard = "*" <> "/" <> "*"
 
---         resp <- runHandler handle
---         case resp of 
---             Left l -> pure $ responseStr status500 [] status500.message
---             Right (r :: resp) -> do 
---                 case handleAcceptH (Proxy :: Proxy ctype) mCtHeader r of 
---                     Nothing -> throw "fatal error"
---                     Just accept -> pure $ responseStr status200 [hContentType /\ fst accept] (snd accept)
+data HeadersUnfold = HeadersUnfold
 
--- -- need to find a better approach
--- err400Response :: Response 
--- err400Response = responseStr status400 [ hContentType /\ "application/json" ] (writeJSON status400)
+instance headersUnfoldUnit ::
+  (Show a, IsSymbol sym, ToHeader a) =>
+  FoldingWithIndex HeadersUnfold (SProxy sym) Unit a (Array (Tuple CaseInsensitiveString String))
+  where
+  foldingWithIndex _ prop _ a = ((wrap $ reflectSymbol prop) /\ (toHeader a)) : []
+
+instance headersUnfold ::
+  (Show a, IsSymbol sym, ToHeader a) =>
+  FoldingWithIndex HeadersUnfold (SProxy sym) (Array (Tuple CaseInsensitiveString String)) a (Array (Tuple CaseInsensitiveString String))
+  where
+  foldingWithIndex _ prop hdrs a =  ((wrap $ reflectSymbol prop) /\ (toHeader a)) : hdrs
+
+headersToUnfoldable' :: forall r.
+  HFoldlWithIndex HeadersUnfold Unit { | r } (Array (Tuple CaseInsensitiveString String)) =>
+  { | r } ->
+  (Array (Tuple CaseInsensitiveString String))
+headersToUnfoldable' r = hfoldlWithIndex HeadersUnfold unit r 
