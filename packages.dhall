@@ -124,11 +124,66 @@ let upstream =
 let overrides = {=}
 
 let additions = 
-    { 
-        wai = ../purescript-wai/spago.dhall as Location 
-    ,   http-types =  ../purescript-http-types/spago.dhall as Location 
-    ,   http-media = ../purescript-http-media/spago.dhall as Location 
-    ,   warp = ../purescript-warp/spago.dhall as Location 
-    }
+  { warp =
+      { dependencies =
+        [ "node-fs-aff"
+        , "node-net"
+        , "node-url"
+        , "wai"
+        ]
+      , repo =
+          "https://github.com/Woody88/purescript-warp.git"
+      , version =
+          "master"
+      }
+  , wai =
+      { dependencies =
+        [ "http-types"
+        , "node-buffer"
+        , "node-http"
+        , "node-net"
+        , "node-streams"
+        , "node-url"
+        ]
+      , repo =
+          "https://github.com/Woody88/purescript-wai.git"
+      , version =
+          "master"
+      }
+  , http-types =
+      { dependencies =
+          [ "console"
+          , "effect"
+          , "psci-support"
+          , "tuples"
+          , "unicode"
+          , "uri"
+          ]
+      , repo =
+          "https://github.com/Woody88/purescript-http-types.git"
+      , version =
+          "master"
+      }
+  , http-media =
+      { dependencies =
+        [ "console"
+        , "effect"
+        , "exceptions"
+        , "foldable-traversable"
+        , "maybe"
+        , "newtype"
+        , "numbers"
+        , "ordered-collections"
+        , "proxy"
+        , "strings"
+        , "stringutils"
+        , "unicode"
+        ]
+      , repo =
+          "https://github.com/Woody88/purescript-http-media.git"
+      , version =
+          "master"
+      }
+  }
 
 in  upstream // overrides // additions

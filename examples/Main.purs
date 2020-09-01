@@ -20,6 +20,7 @@ import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 
 type UserAPI = GetUser :<|> PostUser
+type UserHandler = Handler GetUser String :<|> Handler PostUser (Header' { hello :: String } HelloWorld)
 
 type HelloWorld = { hello :: String }
 
@@ -38,7 +39,7 @@ type PostUser = Post "/user/:id?[maxAge]&[minAge]"
     )
  
 getUser :: Handler GetUser String 
-getUser = pure "Woodson"
+getUser = pure "User"
 
 postUser :: Handler PostUser (Header' { hello :: String } HelloWorld) 
 postUser = do 
@@ -46,13 +47,13 @@ postUser = do
     Console.log accept
     withHeader { hello: "world!" } { hello: "World!" }
 
-server :: _
-server =  getUser :<|> postUser
+api :: UserHandler
+api =  getUser :<|> postUser
 
-api :: Application
-api = swerve (Proxy :: _ UserAPI) server
+app :: Application
+app = swerve (Proxy :: _ UserAPI) api
 
 main :: Effect Unit
 main = do 
     let beforeMainLoop = Console.log $ "Listening on port " <> show defaultSettings.port
-    void $ runSettings defaultSettings { beforeMainLoop = beforeMainLoop } api
+    void $ runSettings defaultSettings { beforeMainLoop = beforeMainLoop } app
