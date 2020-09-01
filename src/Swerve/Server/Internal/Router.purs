@@ -3,18 +3,23 @@ module Swerve.Internal.Router where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Monad.Except (ExceptT, except, throwError)
+import Control.Monad.Except (ExceptT(..), except, lift, runExceptT, throwError)
+import Control.Monad.Reader (runReaderT)
 import Data.Array (mapMaybe)
+import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldrWithIndex)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (unwrap)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Newtype (unwrap, wrap)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple.Nested (type (/\), (/\))
 import Effect.Aff (Aff)
-import Network.Wai (Request)
+import Foreign.Object as Object
+import Network.HTTP.Types (hAccept, hContentType, noContent204, notAcceptable406)
+import Network.Wai (Request, Response, responseStr)
 import Prim.Row as Row
 import Prim.RowList (class RowToList, kind RowList)
 import Prim.RowList as RL
@@ -22,18 +27,121 @@ import Prim.Symbol as Symbol
 import Record as Record
 import Record.Builder (Builder)
 import Record.Builder as Builder
-import Swerve.API.Spec (ReqBody'(..), Resource'(..))
+import Record.Extra (class MapRecord, mapRecord)
+import Swerve.API.Combinators (type (:<|>), (:<|>))
+import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), NoContent(..), handleAcceptH)
+import Swerve.API.Spec (Header'(..), ReqBody'(..), Resource'(..))
+import Swerve.API.StatusCode (class HasStatus, S204, StatusP(..), toStatus)
 import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
 import Swerve.Internal.ParseSpec (class ParseConnSpec, parseConnSpec)
-import Swerve.Server.Internal.ParseBody (class ParseBody, parseBody)
+import Swerve.Server.Internal.Handler (Handler(..), toParams)
+import Swerve.Server.Internal.ParseBody (class ParseBody, class ParseResource, parseBody)
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
+import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
 import Swerve.Server.Internal.ParseMethod (methodCheck)
 import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
-import Swerver.Server.Internal.Conn (ConnectionRow)
+import Swerver.Server.Internal.Conn (class Conn, ConnectionRow)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
+import Type.Row.Homogeneous as Row
+
+
+class RouterI layout handler | layout -> handler, handler -> layout  where
+  routerI :: Proxy layout -> handler -> Request -> ExceptT String Aff Response
+
+
+instance routerIAlt :: 
+  ( RouterI a handlera 
+  , RouterI b handlerb 
+  ) => RouterI (a :<|> b) (handlera :<|> handlerb ) where 
+  routerI _ (handlera :<|> handlerb) req = routerI (Proxy :: _ a) handlera req  <|> routerI (Proxy :: _ b) handlerb req 
+
+else instance routerINoContent :: 
+  ( Router (Verb method S204 path specs) path specs params 
+  , Conn (Verb method S204 path specs) params
+  , HasResponse' (Handler (Verb method S204 path specs) NoContent) params
+  ) => RouterI (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
+  routerI specP handler req = do 
+    params   <- router specP (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req) req 
+    eHandler <- runHandler' params handler req 
+    pure $ responseStr noContent204 [] mempty
+
+else instance routerIImpl :: 
+  ( Router (Verb method status path specs) path specs params 
+  , RowToList specs spcrl 
+  , Conn (Verb method status path specs) params
+  , ParseResource spcrl resp ctype
+  , AllCTRender ctype resp 
+  , HasResponse' handler params  
+  ) => RouterI (Verb method status path specs) handler  where 
+  routerI specP handler req = do 
+    params <- router specP (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req) req 
+    runHandler' params handler req  
+
+
+class HasResponse' handler params where 
+  runHandler' :: { | params } -> handler -> Request -> ExceptT String Aff Response 
+
+instance hasResponseHeader ::
+  ( Conn (Verb method status path specs) params
+  , RowToList specs spcrl 
+  , ParseResource spcrl resp ctype
+  , AllCTRender ctype resp 
+  , Row.Homogeneous hdrs' String 
+  , Row.HomogeneousRowList hdrl' String
+  , RowToList hdrs' hdrl' 
+  , RowToList hdrs hdrl  
+  , ToHeader a
+  , HasStatus status
+  , MapRecord hdrl hdrs a String () hdrs'
+  ) => HasResponse' (Handler (Verb method status path specs) (Header' { | hdrs}   resp)) params where 
+  runHandler' params (Handler handler) req = do
+    let verbP = Proxy :: _ (Verb method status path specs)
+    (Header' hdrs resource) <- runReaderT handler (toParams verbP params)
+    let accH = getAcceptHeader req
+        hdrs' = headersToUnfoldable hdrs
+    case handleAcceptH (Proxy :: _ ctype) accH resource of
+      Nothing -> do
+        throwError notAcceptable406.message
+      Just (ct /\ body) -> do 
+        pure $ responseStr (toStatus (StatusP :: _ status)) ([hContentType /\ ct] <> map (\t -> (wrap $ fst t) /\ snd t) hdrs') body
+
+else instance hasResponse :: 
+  ( Conn (Verb method status path specs) params
+  , RowToList specs spcrl 
+  , ParseResource spcrl resp ctype
+  , AllCTRender ctype resp 
+  , HasStatus status
+  ) => HasResponse' (Handler (Verb method status path specs) resp) params where 
+  runHandler' params (Handler handler) req = do
+    let verbP = Proxy :: _ (Verb method status path specs)
+    resource <- runReaderT handler (toParams verbP params)
+    let accH = getAcceptHeader req
+    case handleAcceptH (Proxy :: _ ctype) accH resource of
+      Nothing -> do
+        throwError notAcceptable406.message
+        -- resp $ responseStr notAcceptable406 [] notAcceptable406.message
+      Just (ct /\ body) -> do 
+        pure $ responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
+
+headersToUnfoldable :: forall r r' rl rl' a.
+  Row.Homogeneous r' String 
+  => Row.HomogeneousRowList rl' String
+  => RowToList r' rl' 
+  => RowToList r rl  
+  => ToHeader a
+  => MapRecord rl r a String () r' 
+  => Record r 
+  -> Array (String /\ String)
+headersToUnfoldable = Object.toUnfoldable <<<  Object.fromHomogeneous <<< mapRecord (toHeader)
+
+getAcceptHeader :: Request -> AcceptHeader
+getAcceptHeader = AcceptHeader <<< fromMaybe ct_wildcard <<< Map.lookup hAccept <<< Map.fromFoldable <<< _.headers <<< unwrap
+
+ct_wildcard :: String
+ct_wildcard = "*" <> "/" <> "*"
 
 class SubRecord (base :: # Type) (sub :: # Type) (conn :: # Type) | base conn -> sub where
   subrecord :: {|base} -> {|conn}

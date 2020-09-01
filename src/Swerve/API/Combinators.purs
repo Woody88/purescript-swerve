@@ -1,6 +1,7 @@
 module Swerve.API.Combinators 
     ( Alt(..)
     , type (:<|>)
+    , (:<|>)
     ) where 
 
 data Alt a b = Alt a b 

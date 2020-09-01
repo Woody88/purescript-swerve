@@ -2,6 +2,7 @@ module Swerve.Server.Internal where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (runReaderT)
 import Data.Either (Either(..))
@@ -21,11 +22,12 @@ import Network.HTTP.Types (hAccept, hContentType, internalServerError500, noCont
 import Network.Wai (Application, Request(..), responseStr)
 import Prim.RowList (class RowToList)
 import Record.Extra (class MapRecord, mapRecord)
-import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), NoContent, PlainText, handleAcceptH)
+import Swerve.API.Combinators (type (:<|>), (:<|>))
+import Swerve.API.ContentTypes (class Accepts, class AllCTRender, class MimeRender, AcceptHeader(..), NoContent, PlainText, handleAcceptH)
 import Swerve.API.Spec (Header'(..))
-import Swerve.API.StatusCode (S200, S204)
-import Swerve.API.Verb (Verb)
-import Swerve.Internal.Router (class Router, router)
+import Swerve.API.StatusCode (class HasStatus, S200, S204, StatusP(..), toStatus)
+import Swerve.API.Verb (Verb, VerbP(..))
+import Swerve.Internal.Router (class Router, class RouterI, router, routerI)
 import Swerve.Server.Internal.Handler (Handler(..), toParams)
 import Swerve.Server.Internal.ParseBody (class ParseBodyCT, class ParseResource)
 import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
@@ -37,69 +39,135 @@ import Type.Row.Homogeneous as Row
 class HasServer layout handler | layout -> handler, handler -> layout where 
   route :: Proxy layout -> handler -> Application 
 
-instance hasVerbNoContent :: 
-  ( Router (Verb method S204 path specs) path specs params 
+class HasResponse handler params where 
+  runHandler :: { | params } -> handler ->  Application 
+
+instance hasVerbAlt :: 
+  ( RouterI a handlera 
+  , RouterI b handlerb 
+  ) => HasServer (a :<|> b) (handlera :<|> handlerb ) where 
+  route _ (handlera :<|> handlerb) req resp = do 
+    let handler = routerI (Proxy :: _ a) handlera req  <|> routerI (Proxy :: _ b) handlerb req 
+    eHandler <- runExceptT handler
+    case eHandler of 
+      Left e -> resp $ responseStr internalServerError500 [] e
+      Right response -> resp response
+
+else instance hasVerbNoContent :: 
+  ( RouterI (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent) 
   , Conn (Verb method S204 path specs) params
   ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
-  route specP handler = noContentRouter specP handler (SProxy :: _ path) (RProxy :: _ specs) 
-else instance hasVerbHeaders ::
-  ( Router (Verb method S200 path specs) path specs params 
-  , RowToList specs spcrl 
-  , ParseResource spcrl resp ctype
-  , Row.Homogeneous hdrs' String 
-  , Row.HomogeneousRowList hdrl' String
-  , RowToList hdrs' hdrl' 
-  , RowToList hdrs hdrl  
-  , ToHeader a
-  , MapRecord hdrl hdrs a String () hdrs'
-  , AllCTRender ctype resp 
-  , Conn (Verb method S200 path specs) params
-  ) => HasServer (Verb method S200 path specs) (Handler (Verb method S200 path specs) (Header' { | hdrs}   resp))  where 
-  route specP handler = routerHeaders specP handler (SProxy :: _ path) (RProxy :: _ specs) 
+  route specP handler req resp = do 
+    eHandler <- runExceptT $ routerI specP handler req 
+    case eHandler of 
+      Left e -> resp $ responseStr internalServerError500 [] e
+      Right response -> resp response
 
-else instance hasVer :: 
-  ( Router (Verb method S200 path specs) path specs params 
+else instance hasVer2 :: 
+  ( RouterI (Verb method status path specs) handler
   , RowToList specs spcrl 
+  , Conn (Verb method status path specs) params
   , ParseResource spcrl resp ctype
   , AllCTRender ctype resp 
-  , Conn (Verb method S200 path specs) params
-  ) => HasServer (Verb method S200 path specs) (Handler (Verb method S200 path specs) resp)  where 
-  route specP handler = router' specP handler (SProxy :: _ path) (RProxy :: _ specs) 
+  , HasResponse handler params  
+  ) => HasServer (Verb method status path specs) handler  where 
+  route specP handler req resp = do 
+    eHandler <- runExceptT $ routerI specP handler req 
+    case eHandler of 
+      Left e -> resp $ responseStr internalServerError500 [] e
+      Right response -> resp response
 
-routerHeaders :: forall path specs params method resp spcrl hdrs hdrs' hdrl hdrl' a ctype.
-  Router (Verb method S200 path specs) path specs params 
-  => Conn (Verb method S200 path specs) params
-  => RowToList specs spcrl 
+-- Start 
+
+-- instance hasVerbAlt :: 
+--   ( HasServer a handlera 
+--   , HasServer b handlerb 
+--   ) => HasServer (a :<|> b) (handlera :<|> handlerb ) where 
+--   route _ (handlera :<|> handlerb) req res = route (Proxy :: _ a) handlera req res <|> route (Proxy :: _ b) handlerb req res
+
+-- else instance hasVerbNoContent :: 
+--   ( Router (Verb method S204 path specs) path specs params 
+--   , Conn (Verb method S204 path specs) params
+--   ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
+--   route specP handler = noContentRouter specP handler (SProxy :: _ path) (RProxy :: _ specs) 
+
+-- else instance hasVer2 :: 
+--   ( Router (Verb method status path specs) path specs params 
+--   , RowToList specs spcrl 
+--   , Conn (Verb method status path specs) params
+--   , ParseResource spcrl resp ctype
+--   , AllCTRender ctype resp 
+--   , HasResponse handler params  
+--   ) => HasServer (Verb method status path specs) handler  where 
+--   route specP handler = router' specP handler (SProxy :: _ path) (RProxy :: _ specs) 
+
+-- instance hasResponseHeader ::
+--   ( Conn (Verb method status path specs) params
+--   , RowToList specs spcrl 
+--   , ParseResource spcrl resp ctype
+--   , AllCTRender ctype resp 
+--   , Row.Homogeneous hdrs' String 
+--   , Row.HomogeneousRowList hdrl' String
+--   , RowToList hdrs' hdrl' 
+--   , RowToList hdrs hdrl  
+--   , ToHeader a
+--   , HasStatus status
+--   , MapRecord hdrl hdrs a String () hdrs'
+--   ) => HasResponse (Handler (Verb method status path specs) (Header' { | hdrs}   resp)) params where 
+--   runHandler params (Handler handler) req resp = do
+--     let verbP = Proxy :: _ (Verb method status path specs)
+--     eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
+--     case eHandler of 
+--       Left e2 -> do 
+--         resp $ responseStr internalServerError500 [] mempty
+--       Right (Header' hdrs resource) -> do 
+--         let accH = getAcceptHeader req
+--             hdrs' = headersToUnfoldable hdrs
+--         case handleAcceptH (Proxy :: _ ctype) accH resource of
+--           Nothing -> do
+--             resp $ responseStr notAcceptable406 [] notAcceptable406.message
+--           Just (ct /\ body) -> do 
+--             resp $ responseStr (toStatus (StatusP :: _ status)) ([hContentType /\ ct] <> map (\t -> (wrap $ fst t) /\ snd t) hdrs') body
+
+-- else instance hasResponse :: 
+--   ( Conn (Verb method status path specs) params
+--   , RowToList specs spcrl 
+--   , ParseResource spcrl resp ctype
+--   , AllCTRender ctype resp 
+--   , HasStatus status
+--   ) => HasResponse (Handler (Verb method status path specs) resp) params where 
+--   runHandler params (Handler handler) req resp = do
+--     let verbP = Proxy :: _ (Verb method status path specs)
+--     eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
+--     case eHandler of 
+--       Left e2 -> do 
+--         resp $ responseStr internalServerError500 [] mempty
+--       Right resource -> do 
+--         let accH = getAcceptHeader req
+--         case handleAcceptH (Proxy :: _ ctype) accH resource of
+--           Nothing -> do
+--             resp $ responseStr notAcceptable406 [] notAcceptable406.message
+--           Just (ct /\ body) -> do 
+--             resp $ responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
+
+--- End
+routerHeaders :: forall path specs params method status resp spcrl hdrs ctype.
+  Router (Verb method status path specs) path specs params 
+  => Conn (Verb method status path specs) params
   => ParseResource spcrl resp ctype
-  => Row.Homogeneous hdrs' String 
-  => Row.HomogeneousRowList hdrl' String
-  => RowToList hdrs' hdrl' 
-  => RowToList hdrs hdrl  
-  => ToHeader a
-  => MapRecord hdrl hdrs a String () hdrs'
-  => AllCTRender ctype resp 
-  => Proxy (Verb method S200 path specs) 
-  -> Handler (Verb method S200 path specs) (Header' { | hdrs } resp)
+  => RowToList specs spcrl 
+  => HasResponse (Handler (Verb method status path specs) (Header' { | hdrs } resp)) params 
+  => Proxy (Verb method status path specs) 
+  -> Handler (Verb method status path specs) (Header' { | hdrs } resp)
   -> SProxy path 
   -> RProxy specs
   -> Application
-routerHeaders verbP (Handler handler) pathP specsP req resp = do 
+routerHeaders verbP handler pathP specsP req resp = do 
+  Console.log "in"
   matchedRoute <- runExceptT $ router verbP pathP specsP (_.url $ unwrap req) req 
   case matchedRoute of 
     Left e -> resp $ responseStr internalServerError500 [] mempty
-    Right params -> do
-      eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
-      case eHandler of 
-        Left e2 -> do 
-          resp $ responseStr internalServerError500 [] mempty
-        Right (Header' hdrs resource) -> do 
-          let accH = getAcceptHeader req
-              hdrs' = headersToUnfoldable hdrs
-          case handleAcceptH (Proxy :: _ ctype) accH resource of
-            Nothing -> do
-              resp $ responseStr notAcceptable406 [] notAcceptable406.message
-            Just (ct /\ body) -> do 
-              resp $ responseStr ok200  ([hContentType /\ ct] <> map (\t -> (wrap $ fst t) /\ snd t) hdrs') body
+    Right params -> runHandler params handler req resp
 
 headersToUnfoldable :: forall r r' rl rl' a.
   Row.Homogeneous r' String 
@@ -112,33 +180,24 @@ headersToUnfoldable :: forall r r' rl rl' a.
   -> Array (String /\ String)
 headersToUnfoldable = Object.toUnfoldable <<<  Object.fromHomogeneous <<< mapRecord (toHeader)
 
-router' :: forall path specs params method resp spcrl ctype.
-  Router (Verb method S200 path specs) path specs params 
-  => Conn (Verb method S200 path specs) params
+router' :: forall path specs params method status handler resp spcrl ctype.
+  Router (Verb method status path specs) path specs params 
+  => Conn (Verb method status path specs) params
   => RowToList specs spcrl 
   => ParseResource spcrl resp ctype
   => AllCTRender ctype resp 
-  => Proxy (Verb method S200 path specs) 
-  -> Handler (Verb method S200 path specs) resp
+  => HasResponse handler params 
+  => Proxy (Verb method status path specs) 
+  -> handler
   -> SProxy path 
   -> RProxy specs
   -> Application
-router' verbP (Handler handler) pathP specsP req resp = do 
+router' verbP handler pathP specsP req resp = do 
+  Console.log "in2"
   matchedRoute <- runExceptT $ router verbP pathP specsP (_.url $ unwrap req) req 
   case matchedRoute of 
-    Left e -> resp $ responseStr internalServerError500 [] mempty
-    Right params -> do
-      eHandler <- runExceptT $ runReaderT handler (toParams verbP params)
-      case eHandler of 
-        Left e2 -> do 
-          resp $ responseStr internalServerError500 [] mempty
-        Right resource -> do 
-          let accH = getAcceptHeader req
-          case handleAcceptH (Proxy :: _ ctype) accH resource of
-            Nothing -> do
-              resp $ responseStr notAcceptable406 [] notAcceptable406.message
-            Just (ct /\ body) -> do 
-              resp $ responseStr ok200  [hContentType /\ ct] body
+    Left e -> resp $ responseStr internalServerError500 [] e
+    Right params -> runHandler params handler req resp 
 
 noContentRouter :: forall path specs params method.
   Router (Verb method S204 path specs) path specs params 
@@ -165,21 +224,6 @@ getAcceptHeader = AcceptHeader <<< fromMaybe ct_wildcard <<< Map.lookup hAccept 
 
 ct_wildcard :: String
 ct_wildcard = "*" <> "/" <> "*"
-
--- instance hasVerb :: 
---   ( ParseRoute path specs params 
---   , Conn (Verb GET status path specs) params
---   , Show a 
---   ) => HasServer (Verb GET status path specs) (Handler (Verb GET status path specs) a)  where 
---   route specP (Handler handler) url req resp = case parseRoute (SProxy :: _ path) (RProxy :: _ specs) url of 
---     Left e     -> throw e 
---     Right params -> do 
---       eHandler <- runExceptT $ runReaderT handler (toParams specP params)
---       case eHandler of 
---         Left e2 -> throw e2
---         Right str -> pure $ show str
-
-
 
 
 

@@ -47,8 +47,8 @@ else instance parseResource' ::
   ( ParseResource tl a ctype
   ) => ParseResource (RL.Cons k v tl) a ctype
 
-instance parseBodyRLConsNil ::  ParseBodyRL RL.Nil Unit where 
-  parseBodyRL _ _ = pure unit 
+instance parseBodyRLConsNil ::  ParseBodyRL RL.Nil (ReqBody' Unit ctype) where 
+  parseBodyRL _ _ = pure $ ReqBody' unit 
 
 instance parseBodyRLConsBody :: 
   ( MimeUnrender ctype a

@@ -1,5 +1,7 @@
 module Swerve.Server.Internal.Route where
 
+import Swerve.Server.Internal.ServerError (ServerError(..))
+
 -- import Prelude
 
 -- import Swerve.API.MediaType (kind MediaType)
@@ -12,4 +14,3 @@ module Swerve.Server.Internal.Route where
 -- type Post url res body ctype props = Route url GetRequest body res ctype props 
 
 data RouteResult a = NotMatched | Matched a
-

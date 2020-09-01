@@ -1,4 +1,7 @@
-module Swerve.API.StatusCode where 
+module Swerve.API.StatusCode where
+
+import Network.HTTP.Types (noContent204, ok200)
+import Network.HTTP.Types as H
 
 foreign import kind StatusCode 
 
@@ -52,3 +55,14 @@ foreign import data S503 :: StatusCode
 foreign import data S504 :: StatusCode
 foreign import data S505 :: StatusCode
 foreign import data S511 :: StatusCode
+
+data StatusP ( status :: StatusCode) = StatusP 
+
+class HasStatus (status :: StatusCode) where 
+  toStatus :: StatusP status -> H.Status
+
+instance okStatus :: HasStatus S200 where 
+  toStatus _ = ok200
+
+instance noContent :: HasStatus S204 where 
+  toStatus _ = noContent204

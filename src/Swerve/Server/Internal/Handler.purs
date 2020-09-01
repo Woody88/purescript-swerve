@@ -13,7 +13,7 @@ import Type.Proxy (Proxy)
 import Unsafe.Coerce (unsafeCoerce)
 
 data Params spec
-newtype Handler specs a = Handler (ReaderT (Params specs) (ExceptT ServerError Aff) a)
+newtype Handler specs a = Handler (ReaderT (Params specs) (ExceptT String Aff) a)
 
 toParams :: forall spec params. Conn spec params => Proxy spec -> { | params } -> Params spec
 toParams _ = unsafeCoerce
