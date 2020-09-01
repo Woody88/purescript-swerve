@@ -21,7 +21,7 @@ import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.API.Spec (ReqBody'(..))
 import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
-import Swerve.Server.Internal.Header (class Header, header)
+import Swerve.Server.Internal.Header (class Header, parseHeader)
 import Swerve.Server.Internal.Capture (class Capture, parseCapture)
 import Swerve.Server.Internal.Method (methodCheck)
 import Swerve.Server.Internal.Query (class Query, parseQuery)
@@ -54,7 +54,7 @@ instance routerImpl ::
     where
       bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
 
-      bldrs2 = header (RLProxy :: _ spcl) req
+      bldrs2 = parseHeader (RLProxy :: _ spcl) req
 
       conns p s =  
         { capture: Builder.build p.capture {}

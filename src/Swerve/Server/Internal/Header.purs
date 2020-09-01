@@ -24,26 +24,26 @@ class Header
   (specs :: RowList)
   (hfrom :: # Type) (hto :: # Type) 
   |specs -> hfrom hto where 
-  header :: 
+  parseHeader :: 
     RLProxy specs 
     -> Request
     -> ExceptT String Aff { header :: Builder {| hfrom } {| hto } }
 
 instance headerNil :: Header RL.Nil hto hto where 
-  header _ req = pure { header: identity }
+  parseHeader _ req = pure { header: identity }
 
 instance headerImpl ::
   ( RowToList htypes hrl
   , ParseHeader hrl hfrom' hto 
   , Header tail hfrom hfrom'
   ) => Header (RL.Cons "header" { | htypes } tail) hfrom hto where
-  header _ req = do
-    specs <- header (RLProxy :: _ tail) req 
-    hdr <- except $ parseHeader (RLProxy :: _ hrl) (_.headers $ unwrap req) 
+  parseHeader _ req = do
+    specs <- parseHeader (RLProxy :: _ tail) req 
+    hdr <- except $ parseHeader' (RLProxy :: _ hrl) (_.headers $ unwrap req) 
     pure $ { header: hdr <<< specs.header }
 
 else instance headers :: Header tail hfrom hto => Header (RL.Cons specs htype tail) hfrom hto where 
-  header _ req = header (RLProxy :: _ tail) req
+  parseHeader _ req = parseHeader (RLProxy :: _ tail) req
   
 class ReadHeader a where 
   readHeader :: String -> Maybe a 
@@ -64,10 +64,10 @@ instance toHeaderInt :: ToHeader Int where
   toHeader = show
 
 class ParseHeader (hdrl :: RowList) (hfrom :: # Type) (hto :: # Type) | hdrl -> hfrom hto where 
-  parseHeader :: RLProxy hdrl -> RequestHeaders -> Either String (Builder { | hfrom } { | hto })
+  parseHeader' :: RLProxy hdrl -> RequestHeaders -> Either String (Builder { | hfrom } { | hto })
 
 instance parseHeaderNil :: ParseHeader RL.Nil hto hto where 
-  parseHeader _ _ = pure identity
+  parseHeader' _ _ = pure identity
 
 instance parseHeaderImplMaybe :: 
   ( IsSymbol var
@@ -76,13 +76,13 @@ instance parseHeaderImplMaybe ::
   , Row.Lacks var hfrom'
   , ParseHeader tail hfrom hfrom'
   ) => ParseHeader (RL.Cons var (Maybe vtype) tail) hfrom hto where 
-  parseHeader _ rhdrs = do 
+  parseHeader' _ rhdrs = do 
     let varP = (SProxy :: _ var)
         hdr = Map.fromFoldable rhdrs
                     # (readHeader <=< Map.lookup (wrap $ reflectSymbol varP))
                     # Builder.insert varP
 
-    hdrs <- parseHeader (RLProxy :: _ tail) rhdrs 
+    hdrs <- parseHeader' (RLProxy :: _ tail) rhdrs 
     pure $ hdr <<< hdrs
 
 else instance parseHeaderImpl :: 
@@ -92,12 +92,12 @@ else instance parseHeaderImpl ::
   , Row.Lacks var hfrom'
   , ParseHeader tail hfrom hfrom'
   ) => ParseHeader (RL.Cons var vtype tail) hfrom hto where 
-  parseHeader _ rhdrs = do 
+  parseHeader' _ rhdrs = do 
     let varP = (SProxy :: _ var)
         mHeader = Map.fromFoldable rhdrs
                     # (readHeader <=< Map.lookup (wrap $ reflectSymbol varP))
 
-    hdrs <- parseHeader (RLProxy :: _ tail) rhdrs 
+    hdrs <- parseHeader' (RLProxy :: _ tail) rhdrs 
     hdr <- case mHeader of 
             Nothing -> Left $ "header could not be parsed. " <> (reflectSymbol varP) <> "in" <> show rhdrs
             Just (v :: vtype) -> pure $ Builder.insert varP v 
