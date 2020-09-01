@@ -137,4 +137,4 @@ main :: Effect Unit
 main = do 
     let beforeMainLoop = Console.log $ "Listening on port " <> show defaultSettings.port
     void $ runSettings defaultSettings { beforeMainLoop = beforeMainLoop } app
-```⏎             
+```         
