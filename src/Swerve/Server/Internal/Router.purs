@@ -22,9 +22,9 @@ import Record.Builder as Builder
 import Swerve.API.Spec (ReqBody'(..))
 import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
 import Swerve.Server.Internal.Header (class Header, header)
-import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
-import Swerve.Server.Internal.ParseMethod (methodCheck)
-import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
+import Swerve.Server.Internal.Capture (class Capture, parseCapture)
+import Swerve.Server.Internal.Method (methodCheck)
+import Swerve.Server.Internal.Query (class Query, parseQuery)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
 import Swerve.Server.Internal.ReqBody (class ReqBody, reqBody)
 import Swerver.Server.Internal.Conn (class MkConn, ConnectionRow, mkConn)
@@ -87,7 +87,7 @@ instance parsePathNil :: ParsePath PNil specs cto cto qto qto where
 instance parsePathCapture ::
   ( IsSymbol var
   , Row.Cons "capture" { | cspcs } _spcs spcs
-  , ParseCapture var cspcs cfrom' cto 
+  , Capture var cspcs cfrom' cto 
   , ParsePath tail spcs cfrom cfrom' qfrom qto
   ) => ParsePath (PCons (CaptureVar var) tail) spcs cfrom cto qfrom qto where
   parsePath _ specs url url' = do
@@ -111,7 +111,7 @@ instance parsePathQuery ::
   ( IsSymbol var
   , Row.Cons "query" { | qspcs } _spcs spcs
   , Row.Cons var vtype r qspcs
-  , ParseQuery var vtype qfrom' qto 
+  , Query var vtype qfrom' qto 
   , ParsePath tail spcs cfrom cto qfrom qfrom'
   ) => ParsePath (PCons (QueryVar var) tail) spcs cfrom cto qfrom qto where
   parsePath _ specs url url' = do

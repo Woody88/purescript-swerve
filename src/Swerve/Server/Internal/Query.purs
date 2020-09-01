@@ -1,4 +1,4 @@
-module Swerve.Server.Internal.ParseQuery where
+module Swerve.Server.Internal.Query where
 
 import Prelude
 
@@ -20,7 +20,7 @@ instance readQueryString :: ReadQuery String where
 instance readQueryInt :: ReadQuery Int where 
   readQuery = Int.fromString
   
-class ParseQuery (var :: Symbol) vtype (qfrom :: # Type) (qto :: # Type) | var vtype -> qfrom qto where 
+class Query (var :: Symbol) vtype (qfrom :: # Type) (qto :: # Type) | var vtype -> qfrom qto where 
   parseQuery :: SProxy var -> Proxy vtype -> String -> Either String (Builder { | qfrom } { | qto })
 
 instance parseQueryImplMaybe :: 
@@ -28,7 +28,7 @@ instance parseQueryImplMaybe ::
   , ReadQuery vtype
   , Row.Cons var (Maybe vtype) qfrom qto
   , Row.Lacks var qfrom
-  ) => ParseQuery var (Maybe vtype) qfrom qto where 
+  ) => Query var (Maybe vtype) qfrom qto where 
   parseQuery _ _ val = do 
     pure $ Builder.insert (SProxy :: _ var) $ readQuery val
 
@@ -37,7 +37,7 @@ else instance parseQueryImpl ::
   , ReadQuery vtype 
   , Row.Cons var vtype qfrom qto
   , Row.Lacks var qfrom
-  ) => ParseQuery var vtype qfrom qto where 
+  ) => Query var vtype qfrom qto where 
   parseQuery _ _ val = do 
     case readQuery val of 
       Nothing -> Left $ "query could not be parsed. " <> (reflectSymbol (SProxy :: _ var)) <> " " <> val

@@ -1,4 +1,4 @@
-module Swerve.Server.Internal.ParseMethod where
+module Swerve.Server.Internal.Method where
 
 import Prelude
 

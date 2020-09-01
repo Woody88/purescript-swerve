@@ -23,7 +23,7 @@ import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
 import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Handler (Handler(..), toParams)
 import Swerve.Server.Internal.Resource (class Resource)
-import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
+import Swerve.Server.Internal.Header (class ToHeader, toHeader)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Proxy (Proxy(..))
 

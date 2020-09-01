@@ -1,4 +1,4 @@
-module Swerve.Server.Internal.ParseCapture where
+module Swerve.Server.Internal.Capture where
 
 import Prelude
 
@@ -20,7 +20,7 @@ instance readCaptureString :: ReadCapture String where
 instance readCaptureInt :: ReadCapture Int where 
   readCapture = Int.fromString
   
-class ParseCapture (var :: Symbol) (specs :: # Type) (cfrom :: # Type) (cto :: # Type) | var specs -> cfrom cto where 
+class Capture (var :: Symbol) (specs :: # Type) (cfrom :: # Type) (cto :: # Type) | var specs -> cfrom cto where 
   parseCapture :: SProxy var -> RProxy specs -> String -> Either String (Builder { | cfrom } { | cto })
 
 instance parseCaptureImpl :: 
@@ -29,7 +29,7 @@ instance parseCaptureImpl ::
   , ReadCapture vtype 
   , Row.Cons var vtype cfrom cto
   , Row.Lacks var cfrom
-  ) => ParseCapture var specs cfrom cto where 
+  ) => Capture var specs cfrom cto where 
   parseCapture _ _ val = do 
     case readCapture val of 
       Nothing -> Left "capture could not be parsed."
