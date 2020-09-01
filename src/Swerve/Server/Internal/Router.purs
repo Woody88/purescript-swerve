@@ -3,98 +3,35 @@ module Swerve.Internal.Router where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Monad.Except (ExceptT(..), except, lift, runExceptT, throwError)
-import Control.Monad.Reader (runReaderT)
+import Control.Monad.Except (ExceptT, except, throwError)
 import Data.Array (mapMaybe)
-import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldrWithIndex)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
-import Data.Newtype (unwrap, wrap)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (unwrap)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Data.Tuple (Tuple(..), fst, snd)
-import Data.Tuple.Nested (type (/\), (/\))
+import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import Foreign.Object as Object
-import Network.HTTP.Types (hAccept, hContentType, noContent204, notAcceptable406)
-import Network.Wai (Request, Response, responseStr)
+import Network.Wai (Request)
 import Prim.Row as Row
-import Prim.RowList (class RowToList, kind RowList)
-import Prim.RowList as RL
-import Prim.Symbol as Symbol
-import Record as Record
+import Prim.RowList (class RowToList)
 import Record.Builder (Builder)
 import Record.Builder as Builder
-import Record.Extra (class MapRecord, mapRecord)
-import Swerve.API.Combinators (type (:<|>), (:<|>))
-import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), NoContent(..), handleAcceptH)
-import Swerve.API.Spec (Header'(..), ReqBody'(..), Resource'(..))
-import Swerve.API.StatusCode (class HasStatus, S204, StatusP(..), toStatus)
+import Swerve.API.Spec (ReqBody'(..))
 import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
 import Swerve.Internal.ParseSpec (class ParseConnSpec, parseConnSpec)
-import Swerve.Server.Internal.Handler (Handler(..), toParams)
-import Swerve.Server.Internal.ParseBody (class ParseBody, class ParseResource, parseBody)
+import Swerve.Server.Internal.ParseBody (class ParseBody, parseBody)
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
-import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
 import Swerve.Server.Internal.ParseMethod (methodCheck)
 import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
-import Swerver.Server.Internal.Conn (class Conn, ConnectionRow)
+import Swerver.Server.Internal.Conn (class MkConn, ConnectionRow, mkConn)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
 import Type.Proxy (Proxy(..))
-import Type.Row.Homogeneous as Row
 
-
-class SubRecord (base :: # Type) (sub :: # Type) (conn :: # Type) | base conn -> sub where
-  subrecord :: {|base} -> {|conn}
-
-instance subrecordI ::
-  ( RowToList sub rl
-  , SubRecordRL base rl () conn
-  ) => SubRecord base sub conn where
-  subrecord base =
-    Builder.build (subrecordRL base (RLProxy :: _ rl)) {}
-
-class SubRecordRL (base :: # Type) (rl :: RowList) (from :: # Type) (to :: # Type) | rl -> from to where
-  subrecordRL :: {|base} -> RLProxy rl -> Builder {|from} {|to}
-
-instance subrecordRLNil :: SubRecordRL base RL.Nil () () where
-  subrecordRL _ _ = identity
-
-instance subrecordRLConsResource :: SubRecordRL base (RL.Cons "resource" (Resource' v ctype) tl) from from where
-  subrecordRL b rl = identity
-
-else instance subrecordRLConsBody ::
-         ( SubRecordRL base tl from from'
-         , Symbol.Append "body" "" k
-         , IsSymbol k
-         , Row.Cons k v _b base
-         , Row.Cons k v from' to
-         , Row.Lacks k from'
-         ) => SubRecordRL base (RL.Cons "body" (ReqBody' v ctype) tl) from to where
-  subrecordRL base _ = hBuilder <<< tlBuilder
-    where
-      tlBuilder = subrecordRL base (RLProxy :: _ tl)
-      sp = SProxy :: _ k
-      v = Record.get sp base
-      hBuilder = Builder.insert (SProxy :: _ k) v
-
-else instance subrecordRLCons ::
-         ( SubRecordRL base tl from from'
-         , IsSymbol k
-         , Row.Cons k v _b base
-         , Row.Cons k v from' to
-         , Row.Lacks k from'
-         ) => SubRecordRL base (RL.Cons k v tl) from to where
-  subrecordRL base _ = hBuilder <<< tlBuilder
-    where
-      tlBuilder = subrecordRL base (RLProxy :: _ tl)
-      sp = SProxy :: _ k
-      v = Record.get sp base
-      hBuilder = Builder.insert (SProxy :: _ k) v
 
 class Router verb (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
   router :: Proxy verb -> SProxy url -> RProxy specs -> String -> Request -> ExceptT String Aff {|conn}
@@ -105,14 +42,14 @@ instance routerImpl ::
   , ParsePath xs specs () cap () qry 
   , ParseConnSpec spcl () hdr 
   , ParseBody specs (ReqBody' bdy ctype)
-  , SubRecord (ConnectionRow cap qry hdr bdy) specs conn
+  , MkConn (ConnectionRow cap qry hdr bdy) specs conn
   , ReflectMethod method
   ) => Router (Verb method status url specs) url specs conn where
   router vp _ rp url req = do 
     _ <- except $ methodCheck (reflectMethod (VerbP :: _ method)) req
     { capture, query, header } <- conns <$> bldrs <*> bldrs2
     (ReqBody' (body :: bdy))  <- parseBody rp req 
-    pure $ subrecord { capture, query, header, body }
+    pure $ mkConn { capture, query, header, body }
       
     where
       bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
@@ -125,6 +62,7 @@ instance routerImpl ::
         , header: Builder.build s.header {}
         }
 
+-- | Parse Router by matching Path
 class ParsePath 
   (xs :: PList) (specs :: # Type) 
   (cfrom :: # Type) (cto :: # Type) 

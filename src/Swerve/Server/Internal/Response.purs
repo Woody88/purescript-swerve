@@ -8,17 +8,15 @@ import Data.Array ((:))
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap, wrap)
-import Data.String.CaseInsensitive (CaseInsensitiveString(..))
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Data.Tuple (Tuple(..), fst, snd)
-import Data.Tuple.Nested (type (/\), (/\))
+import Data.String.CaseInsensitive (CaseInsensitiveString)
+import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
+import Data.Tuple (Tuple)
+import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff)
-import Foreign.Object as Object
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
-import Network.HTTP.Types (ResponseHeaders, hAccept, hContentType, notAcceptable406)
+import Network.HTTP.Types (hAccept, hContentType, notAcceptable406)
 import Network.Wai (Request, Response, responseStr)
 import Prim.RowList (class RowToList)
-import Record.Extra (class MapRecord, mapRecord)
 import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), handleAcceptH)
 import Swerve.API.Spec (Header'(..))
 import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
@@ -27,9 +25,7 @@ import Swerve.Server.Internal.Handler (Handler(..), toParams)
 import Swerve.Server.Internal.ParseBody (class ParseResource)
 import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
 import Swerver.Server.Internal.Conn (class Conn)
-import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
-import Type.Row.Homogeneous as Row
 
 class HasResponse handler params where 
   runHandler :: { | params } -> handler -> Request -> ExceptT String Aff Response
@@ -80,19 +76,21 @@ ct_wildcard = "*" <> "/" <> "*"
 data HeadersUnfold = HeadersUnfold
 
 instance headersUnfoldUnit ::
-  (Show a, IsSymbol sym, ToHeader a) =>
-  FoldingWithIndex HeadersUnfold (SProxy sym) Unit a (Array (Tuple CaseInsensitiveString String))
+  ( IsSymbol sym
+  , ToHeader a
+  ) => FoldingWithIndex HeadersUnfold (SProxy sym) Unit a (Array (Tuple CaseInsensitiveString String))
   where
   foldingWithIndex _ prop _ a = ((wrap $ reflectSymbol prop) /\ (toHeader a)) : []
 
 instance headersUnfold ::
-  (Show a, IsSymbol sym, ToHeader a) =>
-  FoldingWithIndex HeadersUnfold (SProxy sym) (Array (Tuple CaseInsensitiveString String)) a (Array (Tuple CaseInsensitiveString String))
+  ( IsSymbol sym
+  , ToHeader a
+  ) => FoldingWithIndex HeadersUnfold (SProxy sym) (Array (Tuple CaseInsensitiveString String)) a (Array (Tuple CaseInsensitiveString String))
   where
   foldingWithIndex _ prop hdrs a =  ((wrap $ reflectSymbol prop) /\ (toHeader a)) : hdrs
 
 headersToUnfoldable' :: forall r.
-  HFoldlWithIndex HeadersUnfold Unit { | r } (Array (Tuple CaseInsensitiveString String)) =>
-  { | r } ->
-  (Array (Tuple CaseInsensitiveString String))
+  HFoldlWithIndex HeadersUnfold Unit { | r } (Array (Tuple CaseInsensitiveString String)) 
+  => { | r } 
+  -> (Array (Tuple CaseInsensitiveString String))
 headersToUnfoldable' r = hfoldlWithIndex HeadersUnfold unit r 
