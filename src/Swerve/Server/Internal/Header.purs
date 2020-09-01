@@ -17,6 +17,7 @@ import Prim.RowList (class RowToList, kind RowList)
 import Prim.RowList as RL
 import Record.Builder (Builder)
 import Record.Builder as Builder
+import Swerve.API.Spec (Header'(..))
 import Type.Data.RowList (RLProxy(..))
 
 class Header   
@@ -101,3 +102,6 @@ else instance parseHeaderImpl ::
             Nothing -> Left $ "header could not be parsed. " <> (reflectSymbol varP) <> "in" <> show rhdrs
             Just (v :: vtype) -> pure $ Builder.insert varP v 
     pure (hdr <<< hdrs)
+
+withHeader :: forall m headers a. Monad m => { | headers } -> a -> m (Header' { | headers} a)
+withHeader hdr a = pure $ Header' hdr a

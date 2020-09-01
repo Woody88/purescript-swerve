@@ -15,12 +15,8 @@ import Network.HTTP.Media (MediaType, (//))
 import Prim.TypeError as TE
 import Simple.JSON as Json
 import Swerve.API.Combinators (type (:<|>))
+import Swerve.API.MediaType (JSON, PlainText, FormUrlEncoded)
 import Type.Proxy (Proxy(..))
-
-data JSON 
-data PlainText 
-data FormUrlEncoded 
-data OctetStream 
 
 data NoContent = NoContent 
 
