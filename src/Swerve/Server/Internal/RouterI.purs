@@ -16,7 +16,7 @@ import Swerve.API.StatusCode (S204)
 import Swerve.API.Verb (Verb)
 import Swerve.Internal.Router (class Router, router)
 import Swerve.Server.Internal.Handler (Handler)
-import Swerve.Server.Internal.ParseBody (class ParseResource)
+import Swerve.Server.Internal.Resource (class Resource)
 import Swerve.Server.Internal.Response (class HasResponse, runHandler)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Data.Row (RProxy(..))
@@ -45,7 +45,7 @@ else instance routerIImpl ::
   ( Router (Verb method status path specs) path specs params 
   , RowToList specs spcrl 
   , Conn (Verb method status path specs) params
-  , ParseResource spcrl resp ctype
+  , Resource spcrl resp ctype
   , AllCTRender ctype resp 
   , HasResponse handler params  
   ) => RouterI (Verb method status path specs) handler  where 

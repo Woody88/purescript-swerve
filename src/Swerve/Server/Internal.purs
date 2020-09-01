@@ -13,7 +13,6 @@ import Swerve.API.ContentTypes (class AllCTRender, NoContent)
 import Swerve.API.StatusCode (S204)
 import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Handler (Handler)
-import Swerve.Server.Internal.ParseBody (class ParseResource)
 import Swerve.Server.Internal.RouterI (class RouterI, routerI)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Proxy (Proxy(..))
@@ -46,7 +45,6 @@ else instance hasVer2 ::
   ( RouterI (Verb method status path specs) handler
   , RowToList specs spcrl 
   , Conn (Verb method status path specs) params
-  , ParseResource spcrl resp ctype
   , AllCTRender ctype resp 
   ) => HasServer (Verb method status path specs) handler  where 
   route specP handler req resp = do 

@@ -22,7 +22,7 @@ import Swerve.API.Spec (Header'(..))
 import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
 import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Handler (Handler(..), toParams)
-import Swerve.Server.Internal.ParseBody (class ParseResource)
+import Swerve.Server.Internal.Resource (class Resource)
 import Swerve.Server.Internal.ParseHeader (class ToHeader, toHeader)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Proxy (Proxy(..))
@@ -33,7 +33,7 @@ class HasResponse handler params where
 instance hasResponseHeader ::
   ( Conn (Verb method status path specs) params
   , RowToList specs spcrl 
-  , ParseResource spcrl resp ctype
+  , Resource spcrl resp ctype
   , AllCTRender ctype resp 
   , HasStatus status
   , HFoldlWithIndex HeadersUnfold Unit { | hdrs } (Array (Tuple CaseInsensitiveString String))
@@ -52,7 +52,7 @@ instance hasResponseHeader ::
 else instance hasResponse :: 
   ( Conn (Verb method status path specs) params
   , RowToList specs spcrl 
-  , ParseResource spcrl resp ctype
+  , Resource spcrl resp ctype
   , AllCTRender ctype resp 
   , HasStatus status
   ) => HasResponse (Handler (Verb method status path specs) resp) params where 

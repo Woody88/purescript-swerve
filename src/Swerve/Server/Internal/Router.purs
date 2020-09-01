@@ -22,7 +22,7 @@ import Record.Builder as Builder
 import Swerve.API.Spec (ReqBody'(..))
 import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
 import Swerve.Internal.ParseSpec (class ParseConnSpec, parseConnSpec)
-import Swerve.Server.Internal.ParseBody (class ParseBody, parseBody)
+import Swerve.Server.Internal.ReqBody (class ReqBody, reqBody)
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
 import Swerve.Server.Internal.ParseMethod (methodCheck)
 import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
@@ -41,14 +41,14 @@ instance routerImpl ::
   , RowToList specs spcl
   , ParsePath xs specs () cap () qry 
   , ParseConnSpec spcl () hdr 
-  , ParseBody specs (ReqBody' bdy ctype)
+  , ReqBody specs (ReqBody' bdy ctype)
   , MkConn (ConnectionRow cap qry hdr bdy) specs conn
   , ReflectMethod method
   ) => Router (Verb method status url specs) url specs conn where
   router vp _ rp url req = do 
     _ <- except $ methodCheck (reflectMethod (VerbP :: _ method)) req
     { capture, query, header } <- conns <$> bldrs <*> bldrs2
-    (ReqBody' (body :: bdy))  <- parseBody rp req 
+    (ReqBody' (body :: bdy))  <- reqBody rp req 
     pure $ mkConn { capture, query, header, body }
       
     where
