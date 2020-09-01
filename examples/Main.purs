@@ -4,19 +4,18 @@ import Prelude
 
 import Control.Monad.Reader (asks)
 import Data.Maybe (Maybe)
-import Data.Newtype (unwrap)
 import Effect (Effect)
 import Effect.Class.Console as Console
 import Network.Wai (Application)
 import Network.Warp.Run (runSettings)
 import Network.Warp.Settings (defaultSettings)
-import Node.FS (FileFlags(..))
 import Swerve.API.Combinators (type (:<|>), (:<|>))
-import Swerve.API.ContentTypes (JSON, NoContent(..), PlainText)
-import Swerve.API.Spec (Capture, ContentType, Header, Header'(..), Query, ReqBody, ReqBody'(..), Resource, withHeader)
-import Swerve.API.Verb (GetNoContent, Post, PostNoContent, Get)
+import Swerve.API.MediaType (JSON, PlainText)
+import Swerve.API.Spec (Capture, Header, Header', Query, ReqBody, Resource)
+import Swerve.API.Verb (Post, Get)
 import Swerve.Server (swerve)
 import Swerve.Server.Internal.Handler (Handler)
+import Swerve.Server.Internal.Header (withHeader)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 
