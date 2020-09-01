@@ -21,12 +21,12 @@ import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.API.Spec (ReqBody'(..))
 import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
-import Swerve.Internal.ParseSpec (class ParseConnSpec, parseConnSpec)
-import Swerve.Server.Internal.ReqBody (class ReqBody, reqBody)
+import Swerve.Server.Internal.Header (class Header, header)
 import Swerve.Server.Internal.ParseCapture (class ParseCapture, parseCapture)
 import Swerve.Server.Internal.ParseMethod (methodCheck)
 import Swerve.Server.Internal.ParseQuery (class ParseQuery, parseQuery)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
+import Swerve.Server.Internal.ReqBody (class ReqBody, reqBody)
 import Swerver.Server.Internal.Conn (class MkConn, ConnectionRow, mkConn)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
@@ -40,7 +40,7 @@ instance routerImpl ::
   ( Parse url xs
   , RowToList specs spcl
   , ParsePath xs specs () cap () qry 
-  , ParseConnSpec spcl () hdr 
+  , Header spcl () hdr 
   , ReqBody specs (ReqBody' bdy ctype)
   , MkConn (ConnectionRow cap qry hdr bdy) specs conn
   , ReflectMethod method
@@ -54,7 +54,7 @@ instance routerImpl ::
     where
       bldrs = parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
 
-      bldrs2 = parseConnSpec (RLProxy :: _ spcl) req
+      bldrs2 = header (RLProxy :: _ spcl) req
 
       conns p s =  
         { capture: Builder.build p.capture {}

@@ -1,21 +1,49 @@
-module Swerve.Server.Internal.ParseHeader where
+module Swerve.Server.Internal.Header where
 
 import Prelude
 
+import Control.Monad.Except (ExceptT, except)
 import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.Newtype (wrap)
+import Data.Newtype (unwrap, wrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Effect.Aff (Aff)
 import Network.HTTP.Types (RequestHeaders)
+import Network.Wai (Request)
 import Prim.Row as Row
-import Prim.RowList (kind RowList)
+import Prim.RowList (class RowToList, kind RowList)
 import Prim.RowList as RL
 import Record.Builder (Builder)
 import Record.Builder as Builder
 import Type.Data.RowList (RLProxy(..))
 
+class Header   
+  (specs :: RowList)
+  (hfrom :: # Type) (hto :: # Type) 
+  |specs -> hfrom hto where 
+  header :: 
+    RLProxy specs 
+    -> Request
+    -> ExceptT String Aff { header :: Builder {| hfrom } {| hto } }
+
+instance headerNil :: Header RL.Nil hto hto where 
+  header _ req = pure { header: identity }
+
+instance headerImpl ::
+  ( RowToList htypes hrl
+  , ParseHeader hrl hfrom' hto 
+  , Header tail hfrom hfrom'
+  ) => Header (RL.Cons "header" { | htypes } tail) hfrom hto where
+  header _ req = do
+    specs <- header (RLProxy :: _ tail) req 
+    hdr <- except $ parseHeader (RLProxy :: _ hrl) (_.headers $ unwrap req) 
+    pure $ { header: hdr <<< specs.header }
+
+else instance headers :: Header tail hfrom hto => Header (RL.Cons specs htype tail) hfrom hto where 
+  header _ req = header (RLProxy :: _ tail) req
+  
 class ReadHeader a where 
   readHeader :: String -> Maybe a 
 
@@ -73,22 +101,3 @@ else instance parseHeaderImpl ::
             Nothing -> Left $ "header could not be parsed. " <> (reflectSymbol varP) <> "in" <> show rhdrs
             Just (v :: vtype) -> pure $ Builder.insert varP v 
     pure (hdr <<< hdrs)
-
-
-
--- else instance parseHeaderImpl :: 
---   ( IsSymbol var
---   , ReadHeader vtype 
---   , Row.Cons var vtype qfrom qto
---   , Row.Lacks var qfrom
---   ) => ParseHeader var vtype qfrom qto where 
---   parseHeader _ _ hdrs = do 
---     let varP = (SProxy :: _ var)
---         mHeader = Map.fromFoldable hdrs
---                     # (readHeader <=< Map.lookup (wrap $ reflectSymbol varP))
-
---     case mHeader of 
---       Nothing -> Left $ "header could not be parsed. " <> (reflectSymbol varP) <> "in" <> show hdrs
---       Just (v :: vtype) -> do 
---         let cBuilder = Builder.insert (SProxy :: _ var) v 
---         pure cBuilder 
