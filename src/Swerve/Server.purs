@@ -1,17 +1,10 @@
 module Swerve.Server where
 
 import Network.Wai (Application)
-import Prim.RowList as RL
-import Swerve.Server.Internal (Server)
-import Swerve.Server.Internal.RouterApplication (class RoutesHandlers, matchRoutesImpl)
-import Type.Data.Row (RProxy(..))
-import Type.Data.RowList (RLProxy(..))
+import Swerve.Server.Internal (class HasServer, route)
+import Type.Proxy (Proxy)
 
-swerve :: forall api apiL handlers
-   . RL.RowToList api apiL
-  => RoutesHandlers apiL api handlers
-  => Server api
-  -> Record handlers
-  -> Application
-swerve api handlers = matchRoutesImpl (RLProxy :: RLProxy apiL) (RProxy :: RProxy api) handlers 
-
+swerve :: forall layout handler. 
+  HasServer layout handler 
+  => Proxy layout -> handler -> Application
+swerve p h xs = route p h xs

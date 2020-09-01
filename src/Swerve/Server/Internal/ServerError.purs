@@ -1,6 +1,5 @@
 module Swerve.Server.Internal.ServerError where 
 
-import Prelude
 import Network.HTTP.Types as HTTP
 
 newtype ServerError 
@@ -11,8 +10,8 @@ newtype ServerError
         , errHeaders      :: Array HTTP.Header
         }
 
-derive newtype instance showServerError :: Show ServerError
-derive newtype instance eqServerError :: Eq ServerError
+-- derive newtype instance showServerError :: Show ServerError
+-- derive newtype instance eqServerError :: Eq ServerError
 
 err500 :: ServerError
 err500 = ServerError { errHTTPCode: 500

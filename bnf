@@ -1,0 +1,14 @@
+api ::= api :<|> api
+    | method
+
+method ::= Get symbol specs
+       | Put symbol  spec
+       | Post symbol specs
+       | Delete symbol specs
+       | Patch symbol specs
+       | Raw  
+
+specs ::= Accept 
+        | Content-Type 
+        | Headers  
+        | QueryParams

@@ -127,6 +127,7 @@ let additions =
     { 
         wai = ../purescript-wai/spago.dhall as Location 
     ,   http-types =  ../purescript-http-types/spago.dhall as Location 
+    ,   http-media = ../purescript-http-media/spago.dhall as Location 
     ,   warp = ../purescript-warp/spago.dhall as Location 
     }
 
