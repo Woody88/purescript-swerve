@@ -24,7 +24,7 @@ type UserHandler = Handler GetUser String :<|> Handler PostUser (Header' { hello
 
 type HelloWorld = { hello :: String }
 
-type GetUser = Get "/users"
+type GetUser = Get "/user"
     ( Resource String PlainText
     + ()
     )
