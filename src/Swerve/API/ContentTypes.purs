@@ -13,6 +13,7 @@ import Foreign as Foreign
 import Network.HTTP.Media as Media
 import Network.HTTP.Media (MediaType, (//))
 import Prim.TypeError as TE
+import Simple.JSON (class WriteForeign)
 import Simple.JSON as Json
 import Swerve.API.Combinators (type (:<|>))
 import Swerve.API.MediaType (JSON, PlainText, FormUrlEncoded)
@@ -63,7 +64,7 @@ instance mimeRenderJson :: Json.WriteForeign a => MimeRender JSON a where
 instance mimeRenderPlainTextString :: MimeRender PlainText String where 
     mimeRender _ = identity
 
-instance mimeRenderPlainTextString :: MimeRender PlainText (Record r) where 
+instance mimeRenderPlainTextRecord :: WriteForeign (Record r) => MimeRender PlainText (Record r) where 
     mimeRender _ = Json.writeJSON
 
 instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncoded where 
