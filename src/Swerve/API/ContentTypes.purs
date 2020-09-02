@@ -63,6 +63,9 @@ instance mimeRenderJson :: Json.WriteForeign a => MimeRender JSON a where
 instance mimeRenderPlainTextString :: MimeRender PlainText String where 
     mimeRender _ = identity
 
+instance mimeRenderPlainTextString :: MimeRender PlainText (Record r) where 
+    mimeRender _ = Json.writeJSON
+
 instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncoded where 
     mimeRender _ = fromMaybe mempty <<< FormURLEncoded.encode
 
