@@ -44,8 +44,7 @@ else instance hasVerbNoContent ::
 else instance hasVer2 :: 
   ( RouterI (Verb method status path specs) handler
   , RowToList specs spcrl 
-  , Conn (Verb method status path specs) params
-  , AllCTRender ctype resp 
+  , Conn (Verb method status path specs) params 
   ) => HasServer (Verb method status path specs) handler  where 
   route specP handler req resp = do 
     eHandler <- runExceptT $ routerI specP handler req 

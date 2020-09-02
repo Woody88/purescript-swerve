@@ -45,8 +45,6 @@ else instance routerIImpl ::
   ( Router (Verb method status path specs) path specs params 
   , RowToList specs spcrl 
   , Conn (Verb method status path specs) params
-  , Resource spcrl resp ctype
-  , AllCTRender ctype resp 
   , HasResponse handler params  
   ) => RouterI (Verb method status path specs) handler  where 
   routerI specP handler req = do 
