@@ -43,8 +43,8 @@ getUser = pure "User"
 
 postUser :: Handler PostUser (Header' { hello :: String } HelloWorld) 
 postUser = do 
-    accept <- asks $ _.header.accept
-    Console.log accept
+    body <- asks $ _.body
+    Console.log $ "Recieved: " <> body
     withHeader { hello: "world!" } { hello: "World!" }
 
 api :: UserHandler

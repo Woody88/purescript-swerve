@@ -9,12 +9,11 @@ import Network.HTTP.Types (internalServerError500)
 import Network.Wai (Application, responseStr)
 import Prim.RowList (class RowToList)
 import Swerve.API.Combinators (type (:<|>), (:<|>))
-import Swerve.API.ContentTypes (class AllCTRender, NoContent)
+import Swerve.API.ContentTypes (NoContent)
 import Swerve.API.StatusCode (S204)
 import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Handler (Handler)
 import Swerve.Server.Internal.RouterI (class RouterI, routerI)
-import Swerver.Server.Internal.Conn (class Conn)
 import Type.Proxy (Proxy(..))
 
 class HasServer layout handler | layout -> handler, handler -> layout where 
@@ -33,7 +32,6 @@ instance hasVerbAlt ::
 
 else instance hasVerbNoContent :: 
   ( RouterI (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent) 
-  , Conn (Verb method S204 path specs) params
   ) => HasServer (Verb method S204 path specs) (Handler (Verb method S204 path specs) NoContent)  where 
   route specP handler req resp = do 
     eHandler <- runExceptT $ routerI specP handler req 
@@ -44,7 +42,6 @@ else instance hasVerbNoContent ::
 else instance hasVer2 :: 
   ( RouterI (Verb method status path specs) handler
   , RowToList specs spcrl 
-  , Conn (Verb method status path specs) params 
   ) => HasServer (Verb method status path specs) handler  where 
   route specP handler req resp = do 
     eHandler <- runExceptT $ routerI specP handler req 

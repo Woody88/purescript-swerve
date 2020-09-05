@@ -21,10 +21,6 @@ toParams _ = unsafeCoerce
 fromParams :: forall spec params. Conn spec params => Params spec -> { | params }
 fromParams = unsafeCoerce
 
--- newtype Handler specs a = Handler (forall conn. Conn specs conn => (ReaderT { | conn } (ExceptT String Effect) a))
-
--- type Handle specs a = Handler specs a 
-
 derive newtype instance functorHandler :: Functor (Handler spec)
 derive newtype instance applyHandler :: Apply (Handler spec)
 derive newtype instance applicativeHandler :: Applicative (Handler spec)
@@ -34,17 +30,3 @@ derive newtype instance monadEffect :: MonadEffect (Handler spec)
 derive newtype instance monadAff :: MonadAff (Handler spec)
 instance monadAskHandler :: Conn spec params => MonadAsk { | params } (Handler spec) where
   ask = Handler (fromParams <$> ask)
-
--- runHandler :: forall specs a conn specs m p t. 
---   Row.Union conn t specs
---   => { | conn }
---   -> Handle (Verb m p specs) { | conn } a 
---   -> Effect (Either String a)
--- runHandler conn (Handler handler) = runExceptT $ runReaderT handler conn
-
--- asks' ::  forall specs a conn specs v m p t.
---   Row.Union conn t specs
---   => Handle (Verb m p specs) { | conn} a  
---   -> ({ | conn } -> v) 
---   -> Handle (Verb m p specs) { | conn} v 
--- asks' = ?hole

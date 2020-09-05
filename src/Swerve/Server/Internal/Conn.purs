@@ -13,6 +13,7 @@ import Record.Builder as Builder
 import Swerve.API.Spec (ReqBody', Resource')
 import Swerve.API.Verb (Verb)
 import Type.Data.RowList (RLProxy(..))
+import Type.RowList (class ListToRow)
 
 type ConnectionRow cap qry hdr bdy
   = ( capture     :: Record cap
@@ -20,10 +21,6 @@ type ConnectionRow cap qry hdr bdy
     , header      :: Record hdr
     , body        :: bdy
     )
-    
-class Conn specs (conn :: # Type) | specs -> conn 
-
-class HasConn (specs :: RowList) (conn :: # Type) | specs -> conn 
 
 class MkConn (base :: # Type) (sub :: # Type) (conn :: # Type) | base conn -> sub where
   mkConn :: {|base} -> {|conn}
@@ -76,14 +73,21 @@ else instance mkConnRLCons ::
       v = Record.get sp base
       hBuilder = Builder.insert (SProxy :: _ k) v
 
+class Conn specs (conn :: # Type) | specs -> conn 
+
+class HasConn (specs :: RowList) (conn :: RowList) | specs ->  conn
+
+-- | creates a connection row type of based on user specs
 instance conn :: 
-  ( HasConn spcl conn 
-  , RL.RowToList specs spcl
+  ( RowToList specs spcl
+  , HasConn spcl connrl
+  , ListToRow connrl conn
   ) => Conn (Verb path status t specs) conn
 
-instance hasConnNil :: HasConn RL.Nil conn
-else instance hasConnCapture :: HasConn tail rest => HasConn (RL.Cons "capture" ctype tail) (capture :: ctype | rest)
-else instance hasConnQuery   :: HasConn tail rest => HasConn (RL.Cons "query" qtype tail) (query :: qtype | rest)
-else instance hasConnHeader  :: HasConn tail rest => HasConn (RL.Cons "header" htype tail) (header :: htype | rest)
-else instance hasConnBody    :: HasConn tail rest => HasConn (RL.Cons "body" (ReqBody' btype ctype) tail) (body :: btype | rest)
-else instance hasConn        :: HasConn tail rest => HasConn (RL.Cons k ctype tail) rest
+instance hasConnNil :: HasConn RL.Nil RL.Nil
+
+instance hasConnCapture :: HasConn tail connrl => HasConn (RL.Cons "capture" t tail) (RL.Cons "capture" t connrl)
+else instance hasConnQuery :: HasConn tail connrl => HasConn (RL.Cons "query" t tail) (RL.Cons "query" t connrl)
+else instance hasConnHeader :: HasConn tail connrl => HasConn (RL.Cons "header" t tail) (RL.Cons "header" t connrl)
+else instance hasConnBody :: HasConn tail connrl => HasConn (RL.Cons "body" (ReqBody' t ctype) tail) (RL.Cons "body" t connrl)
+else instance hasConn :: HasConn tail connrl => HasConn (RL.Cons k t tail) connrl
