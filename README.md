@@ -10,7 +10,28 @@ You can install this package by adding it to your packages.dhall:
 
 ```dhall
 let additions =
-  { warp =
+  { swerve =
+      { dependencies =
+          [ "console"
+          , "effect"
+          , "form-urlencoded"
+          , "heterogeneous"
+          , "http-media"
+          , "http-types"
+          , "media-types"
+          , "psci-support"
+          , "record-format"
+          , "simple-json"
+          , "typelevel-prelude"
+          , "wai"
+          , "warp"
+          ]
+      , repo =
+          "https://github.com/Woody88/purescript-swerve.git"
+      , version =
+          "master"
+      }
+    , warp =
       { dependencies =
         [ "node-fs-aff"
         , "node-net"
@@ -22,54 +43,54 @@ let additions =
       , version =
           "master"
       }
-  , wai =
-      { dependencies =
-        [ "http-types"
-        , "node-buffer"
-        , "node-http"
-        , "node-net"
-        , "node-streams"
-        , "node-url"
-        ]
-      , repo =
-          "https://github.com/Woody88/purescript-wai.git"
-      , version =
-          "master"
-      }
-  , http-types =
-      { dependencies =
-          [ "console"
-          , "effect"
-          , "psci-support"
-          , "tuples"
-          , "unicode"
-          , "uri"
-          ]
-      , repo =
-          "https://github.com/Woody88/purescript-http-types.git"
-      , version =
-          "master"
-      }
-  , http-media =
-      { dependencies =
-        [ "console"
-        , "effect"
-        , "exceptions"
-        , "foldable-traversable"
-        , "maybe"
-        , "newtype"
-        , "numbers"
-        , "ordered-collections"
-        , "proxy"
-        , "strings"
-        , "stringutils"
-        , "unicode"
-        ]
-      , repo =
-          "https://github.com/Woody88/purescript-http-media.git"
-      , version =
-          "master"
-      }
+    , wai =
+        { dependencies =
+            [ "http-types"
+            , "node-buffer"
+            , "node-http"
+            , "node-net"
+            , "node-streams"
+            , "node-url"
+            ]
+        , repo =
+            "https://github.com/Woody88/purescript-wai.git"
+        , version =
+            "master"
+        }
+    , http-types =
+        { dependencies =
+            [ "console"
+            , "effect"
+            , "psci-support"
+            , "tuples"
+            , "unicode"
+            , "uri"
+            ]
+        , repo =
+            "https://github.com/Woody88/purescript-http-types.git"
+        , version =
+            "master"
+        }
+    , http-media =
+        { dependencies =
+            [ "console"
+            , "effect"
+            , "exceptions"
+            , "foldable-traversable"
+            , "maybe"
+            , "newtype"
+            , "numbers"
+            , "ordered-collections"
+            , "proxy"
+            , "strings"
+            , "stringutils"
+            , "unicode"
+            ]
+        , repo =
+            "https://github.com/Woody88/purescript-http-media.git"
+        , version =
+            "master"
+        }
   }
 ```
 ```console
