@@ -1,12 +1,12 @@
-module Examples.Main where
+module Examples.CustomMonad where
 
 import Prelude
 
-import Control.Monad.Reader (class MonadReader, ReaderT(..), ask, asks, lift, runReaderT)
+import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Reader (ReaderT, ask, asks, lift, runReaderT)
 import Data.Maybe (Maybe)
 import Effect (Effect)
 import Effect.Aff (Aff)
-import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
 import Network.Wai (Application)
 import Network.Warp.Run (runSettings)
@@ -15,16 +15,17 @@ import Swerve.API.Combinators (type (:<|>), (:<|>))
 import Swerve.API.MediaType (JSON, PlainText)
 import Swerve.API.Spec (Capture, Header, Header', Query, ReqBody, Resource)
 import Swerve.API.Verb (Post, Get)
-import Swerve.Server (swerve)
-import Swerve.Server.Internal.Handler (Handler, HandlerT(..))
+import Swerve.Server (swerveHoist)
+import Swerve.Server.Internal.Handler (HandlerT)
 import Swerve.Server.Internal.Header (withHeader)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 
-type App = ReaderT String Aff
+type App = (ReaderT String (ExceptT String Aff))
+type Handler specs a = HandlerT specs App a
 
 type UserAPI = GetUser :<|> PostUser
-type UserHandler = HandlerT GetUser App String :<|> HandlerT PostUser App (Header' { hello :: String } HelloWorld)
+type UserHandler = Handler GetUser String :<|> Handler PostUser (Header' { hello :: String } HelloWorld)
 
 type HelloWorld = { hello :: String }
 
@@ -42,24 +43,24 @@ type PostUser = Post "/user/:id?[maxAge]&[minAge]"
     + ()
     )
  
-getUser :: HandlerT GetUser App String 
+getUser :: Handler GetUser String 
 getUser = pure "User"
 
-postUser :: HandlerT PostUser App (Header' { hello :: String } HelloWorld) 
+postUser :: Handler PostUser (Header' { hello :: String } HelloWorld) 
 postUser = do 
     body <- asks $ _.body
     a <- lift $ ask
     Console.log $ "Recieved: " <> body
     Console.log $ "Env: " <> a 
     f <- lift $ myfunc
-    Console.log $ "func val: " <> f
+    Console.log $ "myfunc val: " <> f
     withHeader { hello: "world!" } { hello: "World!" }
 
 api :: UserHandler
 api =  getUser :<|> postUser
 
 app :: Application
-app = swerve (Proxy :: _ UserAPI) (flip runReaderT "hello buy") api
+app = swerveHoist (Proxy :: _ UserAPI) (runExceptT <<< flip runReaderT "hello") api
 
 myfunc :: App String 
 myfunc = do 
