@@ -14,7 +14,7 @@ import Data.Symbol (class IsSymbol, SProxy, reflectSymbol)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
-import Network.HTTP.Types (hAccept, hContentType, notAcceptable406)
+import Network.HTTP.Types (hAccept, hContentType)
 import Network.Wai (Request, Response, Application, responseStr)
 import Prim.RowList (class RowToList)
 import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), handleAcceptH)
@@ -25,6 +25,7 @@ import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Handler (HandlerT(..), toParams)
 import Swerve.Server.Internal.Header (class ToHeader, toHeader)
 import Swerve.Server.Internal.Resource (class Resource)
+import Swerve.Server.Internal.ServerError (ServerError, err406)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Equality (class TypeEquals)
 import Type.Equality as TEQ
@@ -40,7 +41,7 @@ instance hasResponseRaw ::
   , TypeEquals Application waiApplication
   , TypeEquals (Record ()) { | spec }
   , Monad m 
-  , MonadThrow String m
+  , MonadThrow ServerError m
   ) => HasResponse (HandlerT (Raw' path specs) m waiApplication) params m where 
   runHandler params (HandlerT handler) req = do
     let verbP = Proxy :: _ (Raw' path specs)
@@ -54,7 +55,7 @@ instance hasResponseHeader ::
   , AllCTRender ctype resp 
   , HasStatus status
   , Monad m
-  , MonadThrow String m
+  , MonadThrow ServerError m
   , HFoldlWithIndex HeadersUnfold Unit { | hdrs } (Array (Tuple CaseInsensitiveString String))
   ) => HasResponse (HandlerT (Verb method status path specs) m (Header' { | hdrs}   resp)) params m where 
   runHandler params (HandlerT handler) req = do
@@ -64,7 +65,7 @@ instance hasResponseHeader ::
         hdrs' = headersToUnfoldable' hdrs
     case handleAcceptH (Proxy :: _ ctype) accH resource of
       Nothing -> do
-        throwError $ notAcceptable406.message
+        throwError err406
       Just (ct /\ body) -> do 
         pure $ Rsp $ responseStr (toStatus (StatusP :: _ status)) ((hContentType /\ ct) : hdrs') body
 
@@ -75,7 +76,7 @@ else instance hasResponse ::
   , AllCTRender ctype resp 
   , HasStatus status
   , Monad m
-  , MonadThrow String m
+  , MonadThrow ServerError m
   ) => HasResponse (HandlerT (Verb method status path specs) m resp) params m where 
   runHandler params (HandlerT handler) req = do
     let verbP = Proxy :: _ (Verb method status path specs)
@@ -83,7 +84,7 @@ else instance hasResponse ::
     let accH = getAcceptHeader req
     case handleAcceptH (Proxy :: _ ctype) accH resource of
       Nothing -> do
-        throwError $ notAcceptable406.message
+        throwError err406
         -- resp $ responseStr notAcceptable406 [] notAcceptable406.message
       Just (ct /\ body) -> do 
         pure $ Rsp $  responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body

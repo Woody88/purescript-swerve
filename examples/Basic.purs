@@ -2,12 +2,9 @@ module Examples.Basic where
 
 import Prelude
 
-import Control.Monad.Except (runExceptT)
-import Control.Monad.Reader (class MonadReader, ReaderT(..), ask, asks, lift, runReaderT)
+import Control.Monad.Reader (asks)
 import Data.Maybe (Maybe)
 import Effect (Effect)
-import Effect.Aff (Aff)
-import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
 import Network.HTTP.Types (ok200)
 import Network.Wai (Application, responseStr)
@@ -19,7 +16,6 @@ import Swerve.API.Raw (Raw)
 import Swerve.API.Spec (Capture, Header, Header', Query, ReqBody, Resource)
 import Swerve.API.Verb (Post, Get)
 import Swerve.Server (swerve)
-import Swerve.Server.Internal (route)
 import Swerve.Server.Internal.Handler (Handler)
 import Swerve.Server.Internal.Header (withHeader)
 import Type.Proxy (Proxy(..))

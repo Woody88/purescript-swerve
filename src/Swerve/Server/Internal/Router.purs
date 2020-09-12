@@ -3,7 +3,7 @@ module Swerve.Internal.Router where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Monad.Except (ExceptT, except, throwError)
+import Control.Monad.Except (ExceptT, except, throwError, withExceptT)
 import Data.Array (mapMaybe)
 import Data.FoldableWithIndex (foldrWithIndex)
 import Data.Map as Map
@@ -28,6 +28,7 @@ import Swerve.Server.Internal.Method (methodCheck)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
 import Swerve.Server.Internal.Query (class Query, parseQuery)
 import Swerve.Server.Internal.ReqBody (class ReqBody, reqBody)
+import Swerve.Server.Internal.ServerError (ServerError, err400)
 import Swerver.Server.Internal.Conn (class MkConn, ConnectionRow, mkConn)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
@@ -36,7 +37,7 @@ import Type.Equality as TEQ
 import Type.Proxy (Proxy(..))
 
 class Router verb (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
-  router :: Proxy verb -> SProxy url -> RProxy specs -> String -> Request -> ExceptT String Aff {|conn}
+  router :: Proxy verb -> SProxy url -> RProxy specs -> String -> Request -> ExceptT ServerError Aff {|conn}
 
 instance routerRaw :: 
   ( Parse url xs
@@ -44,7 +45,7 @@ instance routerRaw ::
   , TypeEquals (Record ()) { | conn }
   ) => Router (Raw' url specs) url specs conn where
   router vp _ rp url req = do 
-    _ <- parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
+    _ <- withExceptT (const err400) $ parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
     pure $ TEQ.to {}
 
 instance routerImpl ::
@@ -58,8 +59,8 @@ instance routerImpl ::
   ) => Router (Verb method status url specs) url specs conn where
   router vp _ rp url req = do 
     _ <- except $ methodCheck (reflectMethod (VerbP :: _ method)) req
-    { capture, query, header } <- conns <$> bldrs <*> bldrs2
-    (ReqBody' (body :: bdy))  <- reqBody rp req 
+    { capture, query, header } <- withExceptT (const err400) (conns <$> bldrs <*> bldrs2)
+    (ReqBody' (body :: bdy))  <- withExceptT (const err400) $ reqBody rp req 
     pure $ mkConn { capture, query, header, body }
       
     where

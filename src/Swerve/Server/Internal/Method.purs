@@ -8,6 +8,7 @@ import Data.Newtype (unwrap)
 import Network.HTTP.Types (Method)
 import Network.HTTP.Types.Method (methodGet, methodHead)
 import Network.Wai (Request)
+import Swerve.Server.Internal.ServerError (ServerError, err405)
 
 allowedMethodHead :: Method -> Request -> Boolean
 allowedMethodHead method request = method == methodGet && (show $ _.method $ unwrap request) == methodHead
@@ -15,7 +16,7 @@ allowedMethodHead method request = method == methodGet && (show $ _.method $ unw
 allowedMethod :: Method -> Request -> Boolean
 allowedMethod method request = allowedMethodHead method request || (show $ _.method $ unwrap request) == method
 
-methodCheck :: Method -> Request -> Either String Unit 
+methodCheck :: Method -> Request -> Either ServerError Unit 
 methodCheck method request
   | allowedMethod method request = pure unit 
-  | otherwise                    = throwError "Method not allowed"
+  | otherwise                    = throwError err405

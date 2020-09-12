@@ -19,6 +19,7 @@ import Swerve.API.Verb (Verb)
 import Swerve.Internal.Router (class Router, router)
 import Swerve.Server.Internal.Handler (HandlerT)
 import Swerve.Server.Internal.Response (class HasResponse, SwerveResponse, runHandler)
+import Swerve.Server.Internal.ServerError (ServerError)
 import Swerver.Server.Internal.Conn (class Conn)
 import Type.Data.Row (RProxy(..))
 import Type.Equality (class TypeEquals)
@@ -39,12 +40,12 @@ else instance routerINoContent ::
   , Conn (Verb method S204 path specs) params
   , HasResponse (HandlerT (Verb method S204 path specs) m NoContent) params m
   , MonadAff m
-  , MonadThrow String m
+  , MonadThrow ServerError m
   ) => RouterI (Verb method S204 path specs) (HandlerT (Verb method S204 path specs) m NoContent) m where 
   routerI specP handler req = do 
     eparams  <- liftAff $ runExceptT $ router specP (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req) req 
     params   <- either throwError pure eparams
-    runHandler params handler req 
+    runHandler params handler req
 
 else instance routerIImpl :: 
   ( Router (Verb method status path specs) path specs params 
@@ -52,7 +53,7 @@ else instance routerIImpl ::
   , Conn (Verb method status path specs) params
   , HasResponse (HandlerT (Verb method status path specs) m result) params m
   , MonadAff m
-  , MonadThrow String m
+  , MonadThrow ServerError m
   ) => RouterI (Verb method status path specs) (HandlerT (Verb method status path specs) m result) m where 
   routerI specP handler req = do 
     eparams  <- liftAff $ runExceptT $ router specP (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req) req 
@@ -65,9 +66,9 @@ instance routerIRaw ::
   , TypeEquals Application waiApplication
   , HasResponse (HandlerT (Raw' path specs) m waiApplication) params m
   , MonadAff m 
-  , MonadThrow String m
+  , MonadThrow ServerError m
   ) => RouterI (Raw' path specs) (HandlerT (Raw' path specs) m waiApplication) m where 
   routerI specP handler req  = do 
     eparams  <- liftAff $ runExceptT $ router specP (SProxy :: _ path) (RProxy :: _ specs) (_.url $ unwrap req) req 
     params   <- either throwError pure eparams
-    runHandler params handler req 
+    runHandler params handler req

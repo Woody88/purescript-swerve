@@ -7,13 +7,14 @@ import Control.Monad.Reader (class MonadAsk, ReaderT, ask)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
+import Swerve.Server.Internal.ServerError (ServerError)
 import Swerver.Server.Internal.Conn (class Conn)
 import Unsafe.Coerce (unsafeCoerce)
 
 data Params spec
 newtype HandlerT specs m a = HandlerT (ReaderT (Params specs) m a)
 
-type Handler specs a = HandlerT specs (ExceptT String Aff) a 
+type Handler specs a = HandlerT specs (ExceptT ServerError Aff) a 
 
 toParams :: forall spec params proxy . Conn spec params => proxy spec -> { | params } -> Params spec
 toParams _ = unsafeCoerce
