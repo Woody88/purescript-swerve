@@ -7,9 +7,7 @@ import Control.Monad.Reader (class MonadAsk, ReaderT, ask)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
-import Swerve.Server.Internal.ServerError (ServerError)
 import Swerver.Server.Internal.Conn (class Conn)
-import Type.Proxy (Proxy)
 import Unsafe.Coerce (unsafeCoerce)
 
 data Params spec
