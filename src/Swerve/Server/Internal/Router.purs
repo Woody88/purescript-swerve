@@ -19,22 +19,33 @@ import Prim.Row as Row
 import Prim.RowList (class RowToList)
 import Record.Builder (Builder)
 import Record.Builder as Builder
+import Swerve.API.Raw (Raw')
 import Swerve.API.Spec (ReqBody'(..))
 import Swerve.API.Verb (class ReflectMethod, Verb, VerbP(..), reflectMethod)
-import Swerve.Server.Internal.Header (class Header, parseHeader)
 import Swerve.Server.Internal.Capture (class Capture, parseCapture)
+import Swerve.Server.Internal.Header (class Header, parseHeader)
 import Swerve.Server.Internal.Method (methodCheck)
-import Swerve.Server.Internal.Query (class Query, parseQuery)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, PCons, PNil, PProxy(..), QueryVar, Segment, kind PList)
+import Swerve.Server.Internal.Query (class Query, parseQuery)
 import Swerve.Server.Internal.ReqBody (class ReqBody, reqBody)
 import Swerver.Server.Internal.Conn (class MkConn, ConnectionRow, mkConn)
 import Type.Data.Row (RProxy(..))
 import Type.Data.RowList (RLProxy(..))
+import Type.Equality (class TypeEquals)
+import Type.Equality as TEQ
 import Type.Proxy (Proxy(..))
-
 
 class Router verb (url :: Symbol) (specs :: # Type) (conn :: # Type) | url specs -> conn where
   router :: Proxy verb -> SProxy url -> RProxy specs -> String -> Request -> ExceptT String Aff {|conn}
+
+instance routerRaw :: 
+  ( Parse url xs
+  , ParsePath xs specs () cap () qry 
+  , TypeEquals (Record ()) { | conn }
+  ) => Router (Raw' url specs) url specs conn where
+  router vp _ rp url req = do 
+    _ <- parsePath (PProxy :: _ xs) (RProxy :: _ specs) url req
+    pure $ TEQ.to {}
 
 instance routerImpl ::
   ( Parse url xs

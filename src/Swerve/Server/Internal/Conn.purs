@@ -10,9 +10,11 @@ import Prim.Symbol as Symbol
 import Record as Record
 import Record.Builder (Builder)
 import Record.Builder as Builder
+import Swerve.API.Raw (Raw')
 import Swerve.API.Spec (ReqBody', Resource')
 import Swerve.API.Verb (Verb)
 import Type.Data.RowList (RLProxy(..))
+import Type.Equality (class TypeEquals)
 import Type.RowList (class ListToRow)
 
 type ConnectionRow cap qry hdr bdy
@@ -78,6 +80,8 @@ class Conn specs (conn :: # Type) | specs -> conn
 class HasConn (specs :: RowList) (conn :: RowList) | specs ->  conn
 
 -- | creates a connection row type of based on user specs
+instance connRaw :: TypeEquals (Record ()) { | row } => Conn (Raw' path row) row
+
 instance conn :: 
   ( RowToList specs spcl
   , HasConn spcl connrl

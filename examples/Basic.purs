@@ -9,11 +9,13 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
-import Network.Wai (Application)
+import Network.HTTP.Types (ok200)
+import Network.Wai (Application, responseStr)
 import Network.Warp.Run (runSettings)
 import Network.Warp.Settings (defaultSettings)
 import Swerve.API.Combinators (type (:<|>), (:<|>))
 import Swerve.API.MediaType (JSON, PlainText)
+import Swerve.API.Raw (Raw)
 import Swerve.API.Spec (Capture, Header, Header', Query, ReqBody, Resource)
 import Swerve.API.Verb (Post, Get)
 import Swerve.Server (swerve)
@@ -23,11 +25,15 @@ import Swerve.Server.Internal.Header (withHeader)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 
-type UserAPI = GetUser :<|> PostUser
-type UserHandler = Handler GetUser String :<|> Handler PostUser (Header' { hello :: String } HelloWorld)
+type UserAPI = GetUser :<|> PostUser :<|> RawEndpoint 
+type UserHandler 
+    =  Handler GetUser String 
+  :<|> Handler PostUser (Header' { hello :: String } HelloWorld)
+  :<|> Handler RawEndpoint Application
 
 type HelloWorld = { hello :: String }
 
+type RawEndpoint = Raw "/random"
 type GetUser = Get "/user"
     ( Resource String PlainText
     + ()
@@ -51,8 +57,12 @@ postUser = do
     Console.log $ "Recieved: " <> body
     withHeader { hello: "world!" } { hello: "World!" }
 
+rawEndpoint :: Handler RawEndpoint Application 
+rawEndpoint = pure $ \req resp -> do 
+    resp $ responseStr ok200 [] "Hello from Raw endpoint!"
+
 api :: UserHandler
-api =  getUser :<|> postUser
+api =  getUser :<|> postUser :<|> rawEndpoint
 
 app :: Application
 app = swerve (Proxy :: _ UserAPI) api

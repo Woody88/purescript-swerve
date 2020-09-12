@@ -15,9 +15,10 @@ import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Heterogeneous.Folding (class FoldingWithIndex, class HFoldlWithIndex, hfoldlWithIndex)
 import Network.HTTP.Types (hAccept, hContentType, notAcceptable406)
-import Network.Wai (Request, Response, responseStr)
+import Network.Wai (Request, Response, Application, responseStr)
 import Prim.RowList (class RowToList)
 import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), handleAcceptH)
+import Swerve.API.Raw (Raw')
 import Swerve.API.Spec (Header'(..))
 import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
 import Swerve.API.Verb (Verb)
@@ -25,10 +26,26 @@ import Swerve.Server.Internal.Handler (HandlerT(..), toParams)
 import Swerve.Server.Internal.Header (class ToHeader, toHeader)
 import Swerve.Server.Internal.Resource (class Resource)
 import Swerver.Server.Internal.Conn (class Conn)
+import Type.Equality (class TypeEquals)
+import Type.Equality as TEQ
 import Type.Proxy (Proxy(..))
+  
+data SwerveResponse = Rsp Response | Raw Application
 
 class HasResponse handler params m where 
-  runHandler :: { | params } -> handler -> Request -> m Response
+  runHandler :: { | params } -> handler -> Request -> m SwerveResponse
+
+instance hasResponseRaw :: 
+  ( Conn (Raw' path specs) params
+  , TypeEquals Application waiApplication
+  , TypeEquals (Record ()) { | spec }
+  , Monad m 
+  , MonadThrow String m
+  ) => HasResponse (HandlerT (Raw' path specs) m waiApplication) params m where 
+  runHandler params (HandlerT handler) req = do
+    let verbP = Proxy :: _ (Raw' path specs)
+    app <- runReaderT handler (toParams verbP params)
+    pure $ Raw (TEQ.from app) 
 
 instance hasResponseHeader ::
   ( Conn (Verb method status path specs) params
@@ -49,7 +66,7 @@ instance hasResponseHeader ::
       Nothing -> do
         throwError $ notAcceptable406.message
       Just (ct /\ body) -> do 
-        pure $ responseStr (toStatus (StatusP :: _ status)) ((hContentType /\ ct) : hdrs') body
+        pure $ Rsp $ responseStr (toStatus (StatusP :: _ status)) ((hContentType /\ ct) : hdrs') body
 
 else instance hasResponse :: 
   ( Conn (Verb method status path specs) params
@@ -69,7 +86,7 @@ else instance hasResponse ::
         throwError $ notAcceptable406.message
         -- resp $ responseStr notAcceptable406 [] notAcceptable406.message
       Just (ct /\ body) -> do 
-        pure $ responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
+        pure $ Rsp $  responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
 
 getAcceptHeader :: Request -> AcceptHeader
 getAcceptHeader = AcceptHeader <<< fromMaybe ct_wildcard <<< Map.lookup hAccept <<< Map.fromFoldable <<< _.headers <<< unwrap

@@ -17,7 +17,7 @@ newtype HandlerT specs m a = HandlerT (ReaderT (Params specs) m a)
 
 type Handler specs a = HandlerT specs (ExceptT String Aff) a 
 
-toParams :: forall spec params. Conn spec params => Proxy spec -> { | params } -> Params spec
+toParams :: forall spec params proxy . Conn spec params => proxy spec -> { | params } -> Params spec
 toParams _ = unsafeCoerce
 
 fromParams :: forall spec params. Conn spec params => Params spec -> { | params }
