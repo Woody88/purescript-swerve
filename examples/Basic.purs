@@ -47,7 +47,7 @@ type PostUser = Post "/user/:id?[maxAge]&[minAge]"
     )
  
 getUser :: Handler GetUser String 
-getUser = throwError err501 -- pure "User"
+getUser = pure "User" -- throwError err501
 
 postUser :: Handler PostUser (Header' { hello :: String } HelloWorld) 
 postUser = do 
