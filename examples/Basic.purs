@@ -2,6 +2,7 @@ module Examples.Basic where
 
 import Prelude
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (asks)
 import Data.Maybe (Maybe)
 import Effect (Effect)
@@ -18,6 +19,7 @@ import Swerve.API.Verb (Post, Get)
 import Swerve.Server (swerve)
 import Swerve.Server.Internal.Handler (Handler)
 import Swerve.Server.Internal.Header (withHeader)
+import Swerve.Server.Internal.ServerError (err501)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 
@@ -45,7 +47,7 @@ type PostUser = Post "/user/:id?[maxAge]&[minAge]"
     )
  
 getUser :: Handler GetUser String 
-getUser = pure "User"
+getUser = throwError err501 -- pure "User"
 
 postUser :: Handler PostUser (Header' { hello :: String } HelloWorld) 
 postUser = do 

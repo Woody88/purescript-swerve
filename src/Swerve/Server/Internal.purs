@@ -2,10 +2,10 @@ module Swerve.Server.Internal where
 
 import Prelude
 
-import Control.Monad.Except (class MonadError)
+import Control.Monad.Except (class MonadError, runExceptT)
 import Data.Either (Either(..))
-import Effect.Aff (Aff, try)
-import Network.HTTP.Types (internalServerError500, notFound404)
+import Effect.Aff (Aff)
+import Network.HTTP.Types (notFound404)
 import Network.Wai (Application, responseStr)
 import Swerve.Server.Internal.Response (SwerveResponse(..))
 import Swerve.Server.Internal.RouterI (class RouterI, routerI)
@@ -21,14 +21,13 @@ instance hasServerAlt ::
   , MonadError ServerError m
   ) => HasServer api handler m where 
   route api runM handler req resp = do 
-    result <- runM do 
-      r <- try $ routerI api handler req
-      case r of 
-        Left (ServerError e) -> pure $ Rsp $ responseStr notFound404 [] ""
-        Right rsp -> pure rsp  
-
-    case result of
-      Left e   -> resp $ responseServerError e
-      Right rsp -> case rsp of 
-        Rsp response -> resp response
-        Raw app      -> app req resp
+    routerResult <- runExceptT $ routerI api handler req
+    case routerResult of 
+      Left (ServerError e) -> resp $ responseStr notFound404 [] e.errMessage
+      Right handlerM -> do 
+        result <- runM handlerM
+        case result of
+          Left e   -> resp $ responseServerError e
+          Right rsp -> case rsp of 
+            Rsp response -> resp response
+            Raw app      -> app req resp

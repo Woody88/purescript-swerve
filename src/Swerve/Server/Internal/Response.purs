@@ -85,7 +85,6 @@ else instance hasResponse ::
     case handleAcceptH (Proxy :: _ ctype) accH resource of
       Nothing -> do
         throwError err406
-        -- resp $ responseStr notAcceptable406 [] notAcceptable406.message
       Just (ct /\ body) -> do 
         pure $ Rsp $  responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
 

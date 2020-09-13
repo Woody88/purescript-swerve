@@ -1,7 +1,5 @@
 module Swerve.API.Spec where
 
-import Prelude
-
 import Type.Proxy (Proxy)
 
 type Capture record r = (capture :: record | r)
