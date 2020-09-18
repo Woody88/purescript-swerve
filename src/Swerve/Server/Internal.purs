@@ -1,5 +1,14 @@
 module Swerve.Server.Internal where
 
+import Network.Wai (Response)
+import Swerve.Server.Internal.RoutingApplication (RoutingApplication)
+import Type.Proxy (Proxy)
+
+
+class HasServer :: forall k. k -> Type -> Constraint
+class HasServer api handler where 
+  route :: Proxy api -> handler -> RoutingApplication Response
+
 -- import Prelude
 
 -- import Control.Monad.Except (class MonadError, runExceptT)

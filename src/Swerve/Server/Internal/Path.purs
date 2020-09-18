@@ -5,12 +5,12 @@ import Prim.Symbol as Symbol
 import Prim.TypeError (class Fail, Text)
 import Type.Data.Symbol (SProxy)
 
-foreign import kind Path 
+data Path 
 foreign import data CaptureVar :: Symbol -> Path 
 foreign import data QueryVar :: Symbol -> Path 
 foreign import data Segment :: Symbol -> Path
 
-foreign import kind PList
+data PList
 foreign import data PNil :: PList
 foreign import data PCons :: Path -> PList -> PList
 

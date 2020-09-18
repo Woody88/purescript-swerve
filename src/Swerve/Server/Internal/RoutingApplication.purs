@@ -1,9 +1,10 @@
-module Swerve.Server.Internal.RouterApplication where
+module Swerve.Server.Internal.RoutingApplication where
 
 import Prelude
 
 import Effect.Aff (Aff)
-import Network.Wai (Request, Response)
+import Network.Wai (Request)
+import Swerve.Server.Internal.RouteResult (RouteResult)
 
 -- import Type.Data.Row (RProxy)
 -- import Type.Data.RowList (RLProxy)
@@ -11,7 +12,7 @@ import Network.Wai (Request, Response)
 -- import Type.Equality as TypeEq
 -- import Type.Proxy (Proxy(..))
 
--- type RoutingApplication = Request -> (RouteResult Response -> Aff Unit) -> Aff Unit
+type RoutingApplication a = Request -> (RouteResult a -> Aff Unit) -> Aff Unit
 
 -- toApplication :: RoutingApplication -> Application
 -- toApplication ra request respond = ra request routingRespond
