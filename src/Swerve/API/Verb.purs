@@ -1,22 +1,23 @@
 module Swerve.API.Verb where
 
-import Network.HTTP.Types.Method (Method, methodConnect, methodDelete, methodGet, methodHead, methodOptions, methodPatch, methodPost, methodPut, methodTrace)
-import Swerve.API.StatusCode (S200, S201, S202, S203, S204, S205, S206, kind StatusCode)
+import Network.HTTP.Types.Method (Method, methodConnect, methodDelete, methodGet, methodHead, methodOptions, methodPatch, methodPost, methodPut, methodTrace) as H
+import Swerve.API.StatusCode (S200, S201, S202, S203, S205, S206, StatusCode)
+import Type.Proxy (Proxy)
 
-foreign import kind VERB
-foreign import data CONNECT :: VERB
-foreign import data HEAD    :: VERB
-foreign import data GET     :: VERB
-foreign import data POST    :: VERB
-foreign import data PATCH   :: VERB
-foreign import data PUT     :: VERB
-foreign import data DELETE  :: VERB
-foreign import data OPTIONS :: VERB
-foreign import data TRACE   :: VERB
+data Method 
+foreign import data CONNECT :: Method
+foreign import data HEAD    :: Method
+foreign import data GET     :: Method
+foreign import data POST    :: Method
+foreign import data PATCH   :: Method
+foreign import data PUT     :: Method
+foreign import data DELETE  :: Method
+foreign import data OPTIONS :: Method
+foreign import data TRACE   :: Method
 
-data Verb (verb :: VERB) (status :: StatusCode) (path :: Symbol) (specs :: # Type)
+data Verb (method :: Method) (status :: StatusCode) (path :: Symbol)
 
-data VerbP (verb :: VERB) = VerbP
+data NoContentVerb  (method :: Method)
 
 type Get     = Verb GET    S200
 type Post    = Verb POST   S200 
@@ -39,11 +40,11 @@ type PatchtNonAuthoritative = Verb PATCH  S203
 type PutNonAuthoritative    = Verb PUT    S203 
 type DeleteNonAuthoritative = Verb DELETE S203 
 
-type GetNoContent    = Verb GET    S204 
-type PostNoContent   = Verb POST   S204 
-type PatchtNoContent = Verb PATCH  S204 
-type PutNoContent    = Verb PUT    S204 
-type DeleteNoContent = Verb DELETE S204 
+type GetNoContent    = NoContentVerb GET    
+type PostNoContent   = NoContentVerb POST   
+type PatchtNoContent = NoContentVerb PATCH  
+type PutNoContent    = NoContentVerb PUT    
+type DeleteNoContent = NoContentVerb DELETE 
 
 type GetResetContent    = Verb GET    S205
 type PostResetContent   = Verb POST   S205 
@@ -53,32 +54,32 @@ type DeleteResetContent = Verb DELETE S205
 
 type GetPartialContent = Verb GET S206
 
-class ReflectMethod (a :: VERB) where
-    reflectMethod :: VerbP a -> Method
+class ReflectMethod (a :: Method) where
+    reflectMethod :: Proxy a -> H.Method
 
 instance reflectMtdGet :: ReflectMethod GET where
-    reflectMethod _ = methodGet
+    reflectMethod _ = H.methodGet
 
 instance reflectMtdPost :: ReflectMethod POST where
-    reflectMethod _ = methodPost
+    reflectMethod _ = H.methodPost
 
 instance reflectMtdPut :: ReflectMethod PUT where
-    reflectMethod _ = methodPut
+    reflectMethod _ = H.methodPut
 
 instance reflectMtdDelete :: ReflectMethod DELETE where
-    reflectMethod _ = methodDelete
+    reflectMethod _ = H.methodDelete
 
 instance reflectMtdPatch :: ReflectMethod PATCH where
-    reflectMethod _ = methodPatch
+    reflectMethod _ = H.methodPatch
 
 instance reflectMtdHead :: ReflectMethod HEAD where
-    reflectMethod _ = methodHead
+    reflectMethod _ = H.methodHead
 
 instance reflectMtdOptions :: ReflectMethod OPTIONS where
-    reflectMethod _ = methodOptions
+    reflectMethod _ = H.methodOptions
 
 instance reflectMtdTrace :: ReflectMethod TRACE where
-    reflectMethod _ = methodTrace
+    reflectMethod _ = H.methodTrace
 
 instance reflectMtdConnect :: ReflectMethod CONNECT where
-    reflectMethod _ = methodConnect
+    reflectMethod _ = H.methodConnect
