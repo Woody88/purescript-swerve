@@ -3,7 +3,9 @@ module Swerve.Server.Internal.Path where
 
 import Prim.Symbol as Symbol
 import Prim.TypeError (class Fail, Text)
+import Swerve.API.Combinators (type (:>))
 import Type.Data.Symbol (SProxy)
+import Type.Proxy (Proxy(..))
 
 data Path 
 foreign import data CaptureVar :: Symbol -> Path 

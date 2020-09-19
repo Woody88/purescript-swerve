@@ -16,7 +16,7 @@ allowedMethodHead method request = method == methodGet && (show $ _.method $ unw
 allowedMethod :: Method -> Request -> Boolean
 allowedMethod method request = allowedMethodHead method request || (show $ _.method $ unwrap request) == method
 
-methodCheck :: Method -> Request -> Either ServerError Unit 
+methodCheck :: Method -> Request -> Either String  Unit 
 methodCheck method request
   | allowedMethod method request = pure unit 
-  | otherwise                    = throwError err405
+  | otherwise                    = throwError "Bad Method!"

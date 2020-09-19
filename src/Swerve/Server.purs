@@ -1,5 +1,12 @@
 module Swerve.Server where
 
+import Prelude 
+
+import Network.Wai (Application)
+import Swerve.Server.Internal (class HasServer, route)
+import Swerve.Server.Internal.RoutingApplication (toApplication)
+import Type.Proxy (Proxy(..))
+
 -- import Control.Monad.Except (ExceptT, runExceptT)
 -- import Data.Either (Either)
 -- import Effect.Aff (Aff)
@@ -7,6 +14,14 @@ module Swerve.Server where
 -- import Swerve.Server.Internal (class HasServer, route)
 -- import Swerve.Server.Internal.ServerError (ServerError)
 -- import Type.Proxy (Proxy)
+
+swerve :: forall api handler. 
+  HasServer api handler 
+  => Proxy api 
+  -> handler 
+  -> Application
+swerve p h = toApplication $ route p h
+
 
 -- swerve :: forall layout handler. 
 --   HasServer layout handler (ExceptT ServerError Aff)

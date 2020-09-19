@@ -3,8 +3,9 @@ module Swerve.Server.Internal.RoutingApplication where
 import Prelude
 
 import Effect.Aff (Aff)
-import Network.Wai (Request)
-import Swerve.Server.Internal.RouteResult (RouteResult)
+import Network.HTTP.Types (notFound404)
+import Network.Wai (Application, Request, Response, responseStr)
+import Swerve.Server.Internal.RouteResult (RouteResult(..))
 
 -- import Type.Data.Row (RProxy)
 -- import Type.Data.RowList (RLProxy)
@@ -14,9 +15,9 @@ import Swerve.Server.Internal.RouteResult (RouteResult)
 
 type RoutingApplication a = Request -> (RouteResult a -> Aff Unit) -> Aff Unit
 
--- toApplication :: RoutingApplication -> Application
--- toApplication ra request respond = ra request routingRespond
---   where
---     routingRespond :: RouteResult Response -> Effect Unit
---     routingRespond (NotMatched)    = respond $ err400Response
---     routingRespond (Matched v)     = respond v
+toApplication :: RoutingApplication Response -> Application
+toApplication ra request respond = ra request routingRespond
+  where
+    routingRespond :: RouteResult Response -> Aff Unit
+    routingRespond NotMatched   = respond $ responseStr notFound404 [] ""
+    routingRespond (Matched v)    = respond v

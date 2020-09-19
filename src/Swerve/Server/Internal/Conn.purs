@@ -1,5 +1,16 @@
 module Swerver.Server.Internal.Conn where
 
+import Prelude
+
+import Data.Symbol (class IsSymbol, SProxy(..))
+import Prim.Row as Row
+import Prim.RowList (RowList)
+import Prim.RowList as RL
+import Record as Record
+import Record.Builder (Builder)
+import Record.Builder as Builder
+import Type.Proxy (Proxy(..))
+
 -- import Prelude
 
 -- import Data.Symbol (class IsSymbol, SProxy(..))
@@ -24,8 +35,8 @@ module Swerver.Server.Internal.Conn where
 --     , body        :: bdy
 --     )
 
--- class MkConn (base :: # Type) (sub :: # Type) (conn :: # Type) | base conn -> sub where
---   mkConn :: {|base} -> {|conn}
+class MkConn (base :: Row Type) (sub :: Row Type) (conn :: Row Type) | base conn -> sub where
+  mkConn :: {|base} -> {|conn}
 
 -- instance mkConnImpl ::
 --   ( RowToList sub rl
@@ -34,11 +45,12 @@ module Swerver.Server.Internal.Conn where
 --   mkConn base =
 --     Builder.build (mkConnRL base (RLProxy :: _ rl)) {}
 
--- class MkConnRL (base :: # Type) (rl :: RowList) (from :: # Type) (to :: # Type) | rl -> from to where
---   mkConnRL :: {|base} -> RLProxy rl -> Builder {|from} {|to}
+class MkConnRL :: forall k. Row Type -> k -> Row Type -> Row Type -> Constraint
+class MkConnRL (base :: Row Type) rl (from :: Row Type) (to :: Row Type) | rl -> from to where
+  mkConnRL :: {|base} -> Proxy rl -> Builder {|from} {|to}
 
--- instance mkConnRLNil :: MkConnRL base RL.Nil () () where
---   mkConnRL _ _ = identity
+instance mkConnRLNil :: MkConnRL base RL.Nil () () where
+  mkConnRL _ _ = identity
 
 -- -- | Ignore Resource when making connection 
 -- instance mkConnRLConsResource :: MkConnRL base (RL.Cons "resource" (Resource' v ctype) tl) from from where
@@ -61,19 +73,19 @@ module Swerver.Server.Internal.Conn where
 --       hBuilder = Builder.insert (SProxy :: _ k) v
 
 -- -- Inject everything else in Connection
--- else instance mkConnRLCons ::
---   ( MkConnRL base tl from from'
---   , IsSymbol k
---   , Row.Cons k v _b base
---   , Row.Cons k v from' to
---   , Row.Lacks k from'
---   ) => MkConnRL base (RL.Cons k v tl) from to where
---   mkConnRL base _ = hBuilder <<< tlBuilder
---     where
---       tlBuilder = mkConnRL base (RLProxy :: _ tl)
---       sp = SProxy :: _ k
---       v = Record.get sp base
---       hBuilder = Builder.insert (SProxy :: _ k) v
+else instance mkConnRLCons ::
+  ( MkConnRL base tl from from'
+  , IsSymbol k
+  , Row.Cons k v _b base
+  , Row.Cons k v from' to
+  , Row.Lacks k from'
+  ) => MkConnRL base (RL.Cons k v tl) from to where
+  mkConnRL base _ = hBuilder <<< tlBuilder
+    where
+      tlBuilder = mkConnRL base (Proxy :: _ tl)
+      sp = SProxy :: _ k
+      v = Record.get sp base
+      hBuilder = Builder.insert (SProxy :: _ k) v
 
 -- class Conn specs (conn :: # Type) | specs -> conn 
 
