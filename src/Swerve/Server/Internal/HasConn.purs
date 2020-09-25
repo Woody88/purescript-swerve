@@ -7,7 +7,6 @@ import Swerve.API.Resource (Resource)
 import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
 
--- | Will generate a connection row type for a given api 
 class HasConn (api :: Type) (to :: Row Type) | api -> to
 
 instance hasConnResource :: HasConn (Resource a ctype) () 

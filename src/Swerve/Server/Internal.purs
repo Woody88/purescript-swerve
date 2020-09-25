@@ -15,7 +15,7 @@ import Network.Wai (Response, pathInfo, responseStr)
 import Partial.Unsafe (unsafeCrashWith)
 import Prim.Row as Row
 import Prim.Symbol as Symbol
-import Prim.TypeError (Text)
+import Prim.TypeError (Above, Quote, Text)
 import Prim.TypeError as TE
 import Record as Record
 import Record.Builder (Builder)
@@ -31,7 +31,7 @@ import Swerve.Server.Internal.Method (methodCheck)
 import Swerve.Server.Internal.Path (class Parse, CaptureVar, Segment)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.RoutingApplication (RoutingApplication)
-import Swerve.Server.InternalPathSub (class PathSub)
+import Swerve.Server.InternalPathSub (class PathSub, PathEnd)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -41,14 +41,14 @@ class HasServer api handler where
 
 instance hasServerVerb :: 
   ( Parse path plist
-  , PathSub plist api api' 
+  , PathSub plist api' 
   , ReflectMethod method 
-  , HasConn api to
-  , Server api' api' (Verb method status path) handler to to
+  , HasConn api conn
+  , Server api' api (Verb method status path) handler conn conn
   ) => HasServer (Verb method status path :> api) handler where 
   route _ handler req resp = case validateMethod of 
     Left _  -> resp NotMatched
-    Right _ -> server (Proxy :: _ api') (Proxy :: _ api') spec handler identity req resp
+    Right _ -> server (Proxy :: _ api') (Proxy :: _ api) spec handler identity req resp
     where 
       api = Proxy :: _ api
       spec = Proxy :: _ (Verb method status path)
@@ -61,7 +61,7 @@ class Server api spec verb handler (from :: Row Type) (to :: Row Type)| api spec
 instance serverResource :: 
   ( AllCTRender ctype a 
   , HasStatus status
-  ) => Server (Resource a ctype) spec (Verb method status path) (Record to -> Aff a) to to where 
+  ) => Server PathEnd (Resource a ctype) (Verb method status path) (Record to -> Aff a) to to where 
   server _ _ _ handler bldr req resp = do 
     let (conn :: Record to)  = Builder.build bldr $ unsafeCoerce {}  -- what can I do about this?
     resource <- handler conn
@@ -77,7 +77,7 @@ instance serverCapture' ::
   , Row.Union f fy f' 
   , Row.Nub f' fy
   , Server api spec verb handler (capture :: Record fy | from ) (capture :: Record fy | to)
-  )=> Server (Capture vname t :> api) (CaptureVar vname :> spec) verb handler (capture :: Record fy | from ) (capture :: Record fy | to ) where
+  ) => Server (CaptureVar vname :> api) (Capture vname t :> spec) verb handler (capture :: Record fy | from ) (capture :: Record fy | to ) where
   server _ _ verb handler bldr req resp = do 
     case Array.head $ pathInfo req of 
       Nothing  -> resp NotMatched
@@ -95,21 +95,16 @@ instance serverCapture' ::
 
 else instance serverCapture2 :: 
   ( IsSymbol vname 
-  , Symbol.Append "Route does not define a capture :" vname errMsg 
-  , TE.Fail (Text errMsg) 
-  ) => Server (Capture vname t :> api) spec verb handler from to where 
-  server api spec ver handler bldr req resp = unsafeCrashWith ""
-
-instance serverCapture :: 
-  ( Server api spec verb handler from to 
+  , Symbol.Append "could not be found for path attribute :" vname errMsg
+  , TE.Fail (Above (Quote (Capture vname a)) (Text errMsg))
   ) => Server (CaptureVar vname :> api) spec verb handler from to where 
-  server _ spec verb handler bldr req resp = server (Proxy :: _ api) spec verb handler bldr req resp 
+  server api spec ver handler bldr req resp = unsafeCrashWith ""
 
 instance serverSegment :: 
   ( IsSymbol seg
   , Server api spec verb handler from to
-  ) => Server (Segment seg :> api) (Segment seg :> spec) verb handler from to where 
-  server _ _ verb handler bldr req resp = case pathInfo req of 
+  ) => Server (Segment seg :> api) spec verb handler from to where 
+  server _ spec verb handler bldr req resp = case pathInfo req of 
     []   | seg == "/" -> server api spec verb handler bldr (req' 0) resp 
     _    | seg == "/" -> server api spec verb handler bldr (req' 0) resp 
     path | Just s <- Array.head path
@@ -118,7 +113,6 @@ instance serverSegment ::
     where 
       
       api = Proxy :: _ api
-      spec = Proxy :: _ spec
       seg = reflectSymbol (SProxy :: _ seg)
       r = unwrap req
       req' n = wrap $ r { url = String.drop ((String.length seg) + n)  r.url }

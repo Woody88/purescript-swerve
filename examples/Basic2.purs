@@ -19,11 +19,11 @@ type SomeAPI = GetSomeEndpoint
 
 type GetSomeEndpoint
   =  Get "/endpoint/:id/:action"
-  :> Capture "id" Int 
-  :> Capture "action" String 
+  :> Capture "id" Int
+  :> Capture "action" String
   :> Resource String PlainText 
 
-getSomeEndpoint :: { capture :: { id :: Int, action :: String } } ->  Aff String 
+getSomeEndpoint :: {capture :: { id :: Int, action :: String }} ->  Aff String 
 getSomeEndpoint conn = do 
   Console.logShow conn
   pure "HelloWorld" 
