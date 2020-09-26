@@ -16,11 +16,19 @@ import Type.Proxy (Proxy(..))
 -- import Type.Proxy (Proxy)
 
 swerve :: forall api handler. 
-  HasServer api handler 
+  HasServer api () handler 
   => Proxy api 
   -> handler 
   -> Application
-swerve p h = toApplication $ route p h
+swerve p h = swerveContext p {} h
+
+swerveContext :: forall api ctx handler. 
+  HasServer api ctx handler 
+  => Proxy api 
+  -> Record ctx 
+  -> handler 
+  -> Application
+swerveContext p ctx h = toApplication $ route p ctx h
 
 
 -- swerve :: forall layout handler. 
