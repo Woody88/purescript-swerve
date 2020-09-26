@@ -10,6 +10,7 @@ import Network.Warp (defaultSettings, runSettings)
 import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.MediaType (PlainText)
+import Swerve.API.Query (Query)
 import Swerve.API.Resource (Resource)
 import Swerve.API.Verb (Get)
 import Swerve.Server (swerve)
@@ -18,12 +19,14 @@ import Type.Proxy (Proxy(..))
 type SomeAPI = GetSomeEndpoint
 
 type GetSomeEndpoint
-  =  Get "/endpoint/:id/:action"
+  =  Get "/endpoint/:id/:action?[minAge]&[maxAge]"
   :> Capture "id" Int
   :> Capture "action" String
+  :> Query "minAge" Int
+  :> Query "maxAge" Int
   :> Resource String PlainText 
 
-getSomeEndpoint :: {capture :: { id :: Int, action :: String }} ->  Aff String 
+getSomeEndpoint :: {capture :: { id :: Int, action :: String }, query :: { minAge :: Int, maxAge :: Int }} ->  Aff String 
 getSomeEndpoint conn = do 
   Console.logShow conn
   pure "HelloWorld" 

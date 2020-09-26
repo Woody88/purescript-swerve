@@ -4,12 +4,15 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Tuple (fst, snd)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff)
+import Effect.Class.Console as Console
 import Network.HTTP.Types (hContentType)
 import Network.Wai (Response, pathInfo, responseStr)
 import Partial.Unsafe (unsafeCrashWith)
@@ -23,15 +26,17 @@ import Record.Builder as Builder
 import Swerve.API.Capture (class ReadCapture, Capture, readCapture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), handleAcceptH)
+import Swerve.API.Query (class ReadQuery, Query, readQuery)
 import Swerve.API.Resource (Resource)
 import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
 import Swerve.API.Verb (class ReflectMethod, Verb, reflectMethod)
 import Swerve.Server.Internal.HasConn (class HasConn)
 import Swerve.Server.Internal.Method (methodCheck)
-import Swerve.Server.Internal.Path (class Parse, CaptureVar, Segment)
+import Swerve.Server.Internal.Path (class Parse, CaptureVar, QueryVar, Segment)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.RoutingApplication (RoutingApplication)
 import Swerve.Server.InternalPathSub (class PathSub, PathEnd)
+import Swerve.Utils (queryInfo)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -43,7 +48,7 @@ instance hasServerVerb ::
   ( Parse path plist
   , PathSub plist api' 
   , ReflectMethod method 
-  , HasConn api conn
+  , HasConn api () conn
   , Server api' api (Verb method status path) handler conn conn
   ) => HasServer (Verb method status path :> api) handler where 
   route _ handler req resp = case validateMethod of 
@@ -86,6 +91,7 @@ instance serverCapture' ::
         Just (val :: t) -> do 
           let rec = Record.insert (SProxy :: _ vname) val {}
               captureB = Builder.modify (SProxy :: _ "capture") (Record.merge rec)
+          Console.logShow $ _.url $ unwrap (req' var 1)
           server api spec verb handler (captureB >>> bldr) (req' var 1) resp
     where 
       api = Proxy :: _ api
@@ -98,6 +104,39 @@ else instance serverCapture2 ::
   , Symbol.Append "could not be found for path attribute :" vname errMsg
   , TE.Fail (Above (Quote (Capture vname a)) (Text errMsg))
   ) => Server (CaptureVar vname :> api) spec verb handler from to where 
+  server api spec ver handler bldr req resp = unsafeCrashWith ""
+
+instance serverQuery' :: 
+  ( IsSymbol vname
+  , ReadQuery t 
+  , Row.Cons vname t () f
+  , Row.Union f fy f' 
+  , Row.Nub f' fy
+  , Server api spec verb handler (query :: Record fy | from ) (query :: Record fy | to)
+  ) => Server (QueryVar vname :> api) (Query vname t :> spec) verb handler (query :: Record fy | from ) (query :: Record fy | to ) where
+  server _ _ verb handler bldr req resp = do 
+    case Map.lookup queryParam queryMap of 
+      Nothing  -> resp NotMatched
+      Just var -> case readQuery var of 
+        Nothing  -> resp NotMatched
+        Just (val :: t) -> do 
+          let rec = Record.insert (SProxy :: _ vname) val {}
+              queryB = Builder.modify (SProxy :: _ "query") (Record.merge rec)
+          server api spec verb handler (queryB >>> bldr) req' resp
+    where 
+      queryMap = Map.fromFoldable $ queryInfo $ _.url $ unwrap req
+      queryParam = reflectSymbol (SProxy :: _ vname)
+      api = Proxy :: _ api
+      spec = Proxy :: _ spec
+      url' = String.joinWith "&" $ map (\t -> fst t <> "=" <> snd t) $ Map.toUnfoldable $ Map.delete queryParam queryMap
+      r = unwrap req 
+      req' = wrap $ r { url = url' }
+
+else instance serverQuery2 :: 
+  ( IsSymbol vname 
+  , Symbol.Append "could not be found for path query :" vname errMsg
+  , TE.Fail (Above (Quote (Query vname a)) (Text errMsg))
+  ) => Server (QueryVar vname :> api) spec verb handler from to where 
   server api spec ver handler bldr req resp = unsafeCrashWith ""
 
 instance serverSegment :: 
