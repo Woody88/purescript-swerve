@@ -1,5 +1,10 @@
-module Swerve.API.Raw where 
+module Swerve.API.Raw where
 
-type Raw path = Raw' path ()
+import Prelude
 
-data Raw' (path :: Symbol) (specs :: # Type)
+import Swerve.API.Combinators (type (:>))
+import Swerve.API.Resource (Resource)
+
+type Raw path = Raw' path :> Resource Unit Unit 
+
+data Raw' (path :: Symbol)

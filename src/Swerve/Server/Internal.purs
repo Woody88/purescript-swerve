@@ -33,6 +33,7 @@ import Swerve.API.Combinators (type (:>))
 import Swerve.API.ContentTypes (class AllCTRender, class MimeUnrender, AcceptHeader(..), handleAcceptH, mimeUnrender)
 import Swerve.API.Header (class ReadHeader, Header, readHeader)
 import Swerve.API.Query (class ReadQuery, Query, readQuery)
+import Swerve.API.Raw (Raw')
 import Swerve.API.ReqBody (ReqBody)
 import Swerve.API.Resource (Resource)
 import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
@@ -50,6 +51,13 @@ import Unsafe.Coerce (unsafeCoerce)
 class HasServer :: forall k. k -> Type -> Constraint
 class HasServer api handler where 
   route :: Proxy api -> handler -> RoutingApplication Response
+
+instance hasServerRaw :: 
+  ( Parse path plist
+  , PathSub plist api' 
+  , Server api' api (Raw' path) handler () ()
+  ) => HasServer (Raw' path :> api) handler where 
+  route api handler req resp = server (Proxy :: _ api') (Proxy :: _ api) (Proxy :: _ (Raw' path)) handler identity req resp
 
 instance hasServerVerb :: 
   ( Parse path plist
@@ -69,6 +77,10 @@ instance hasServerVerb ::
 class Server :: forall k1 k2. k1 -> k2 -> Type -> Type -> Row Type -> Row Type -> Constraint
 class Server api spec verb handler (from :: Row Type) (to :: Row Type)| api spec handler -> from to where 
   server :: Proxy api -> Proxy spec -> Proxy verb -> handler -> Builder { | from } { | to } -> RoutingApplication Response
+
+instance serverRaw :: 
+  Server PathEnd (Resource Unit Unit) (Raw' path) (Request -> (Response -> Aff Unit) -> Aff Unit) to to where 
+  server _ _ _ handler bldr req resp = handler req (resp <<< Matched)
 
 instance serverResource :: 
   ( AllCTRender ctype a 

@@ -5,13 +5,15 @@ import Prelude
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class.Console as Console
-import Network.Wai (Application)
+import Network.HTTP.Types (ok200)
+import Network.Wai (Application, responseStr)
 import Network.Warp (defaultSettings, runSettings)
 import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.Header (Header)
 import Swerve.API.MediaType (PlainText)
 import Swerve.API.Query (Query)
+import Swerve.API.Raw (Raw)
 import Swerve.API.ReqBody (ReqBody)
 import Swerve.API.Resource (Resource)
 import Swerve.API.Verb (Get, Post)
@@ -21,15 +23,12 @@ import Type.Proxy (Proxy(..))
 type SomeAPI = GetSomeEndpoint
 
 type GetSomeEndpoint
-  =  Post "/endpoint"
-  :> ReqBody String PlainText
-  :> Resource String PlainText 
+  =  Raw "/endpoint"
 
-getSomeEndpoint :: { body :: String } ->  Aff String 
-getSomeEndpoint conn = do 
-  Console.logShow conn
-  pure "HelloWorld" 
-  
+getSomeEndpoint :: Application
+getSomeEndpoint req send = do 
+  send $ responseStr ok200 [] "Hello, world!"
+
 api =  getSomeEndpoint 
 
 app :: Application
