@@ -9,6 +9,7 @@ import Network.Wai (Application)
 import Network.Warp (defaultSettings, runSettings)
 import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
+import Swerve.API.Header (Header)
 import Swerve.API.MediaType (PlainText)
 import Swerve.API.Query (Query)
 import Swerve.API.Resource (Resource)
@@ -24,9 +25,10 @@ type GetSomeEndpoint
   :> Capture "action" String
   :> Query "minAge" Int
   :> Query "maxAge" Int
+  :> Header "name" String 
   :> Resource String PlainText 
 
-getSomeEndpoint :: {capture :: { id :: Int, action :: String }, query :: { minAge :: Int, maxAge :: Int }} ->  Aff String 
+getSomeEndpoint :: {capture :: { id :: Int, action :: String }, query :: { minAge :: Int, maxAge :: Int }, header :: { name :: String } } ->  Aff String 
 getSomeEndpoint conn = do 
   Console.logShow conn
   pure "HelloWorld" 

@@ -26,6 +26,7 @@ import Record.Builder as Builder
 import Swerve.API.Capture (class ReadCapture, Capture, readCapture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), handleAcceptH)
+import Swerve.API.Header (class ReadHeader, Header, readHeader)
 import Swerve.API.Query (class ReadQuery, Query, readQuery)
 import Swerve.API.Resource (Resource)
 import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
@@ -75,7 +76,7 @@ instance serverResource ::
       Just (ct /\ body) -> do 
         resp $ Matched $ responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
 
-instance serverCapture' :: 
+instance serverCapture :: 
   ( IsSymbol vname
   , ReadCapture t 
   , Row.Cons vname t () f
@@ -99,14 +100,14 @@ instance serverCapture' ::
       r = unwrap req 
       req' seg n = wrap $ r { url = String.drop ((String.length seg) + n)  r.url }
 
-else instance serverCapture2 :: 
+else instance serverCaptureFail :: 
   ( IsSymbol vname 
   , Symbol.Append "could not be found for path attribute :" vname errMsg
   , TE.Fail (Above (Quote (Capture vname a)) (Text errMsg))
   ) => Server (CaptureVar vname :> api) spec verb handler from to where 
   server api spec ver handler bldr req resp = unsafeCrashWith ""
 
-instance serverQuery' :: 
+instance serverQuery :: 
   ( IsSymbol vname
   , ReadQuery t 
   , Row.Cons vname t () f
@@ -115,7 +116,7 @@ instance serverQuery' ::
   , Server api spec verb handler (query :: Record fy | from ) (query :: Record fy | to)
   ) => Server (QueryVar vname :> api) (Query vname t :> spec) verb handler (query :: Record fy | from ) (query :: Record fy | to ) where
   server _ _ verb handler bldr req resp = do 
-    case Map.lookup queryParam queryMap of 
+    case Map.lookup queryParam queries of 
       Nothing  -> resp NotMatched
       Just var -> case readQuery var of 
         Nothing  -> resp NotMatched
@@ -124,20 +125,42 @@ instance serverQuery' ::
               queryB = Builder.modify (SProxy :: _ "query") (Record.merge rec)
           server api spec verb handler (queryB >>> bldr) req' resp
     where 
-      queryMap = Map.fromFoldable $ queryInfo $ _.url $ unwrap req
+      queries = Map.fromFoldable $ queryInfo $ _.url $ unwrap req
       queryParam = reflectSymbol (SProxy :: _ vname)
       api = Proxy :: _ api
       spec = Proxy :: _ spec
-      url' = String.joinWith "&" $ map (\t -> fst t <> "=" <> snd t) $ Map.toUnfoldable $ Map.delete queryParam queryMap
+      url' = String.joinWith "&" $ map (\t -> fst t <> "=" <> snd t) $ Map.toUnfoldable $ Map.delete queryParam queries
       r = unwrap req 
       req' = wrap $ r { url = url' }
 
-else instance serverQuery2 :: 
+else instance serverQueryFail :: 
   ( IsSymbol vname 
   , Symbol.Append "could not be found for path query :" vname errMsg
   , TE.Fail (Above (Quote (Query vname a)) (Text errMsg))
   ) => Server (QueryVar vname :> api) spec verb handler from to where 
   server api spec ver handler bldr req resp = unsafeCrashWith ""
+
+instance serverHeader :: 
+  ( IsSymbol vname
+  , ReadHeader t 
+  , Row.Cons vname t () f
+  , Row.Union f fy f' 
+  , Row.Nub f' fy
+  , Server PathEnd spec verb handler (header :: Record fy | from ) (header :: Record fy | to)
+  ) => Server PathEnd (Header vname t :> spec) verb handler (header :: Record fy | from ) (header :: Record fy | to ) where
+  server api _ verb handler bldr req resp = do 
+    case Map.lookup (wrap headerParam) headers of 
+      Nothing  -> resp NotMatched
+      Just var -> case readHeader var of 
+        Nothing  -> resp NotMatched
+        Just (val :: t) -> do 
+          let rec = Record.insert (SProxy :: _ vname) val {}
+              headerB = Builder.modify (SProxy :: _ "header") (Record.merge rec)
+          server api spec verb handler (headerB >>> bldr) req resp
+    where 
+      headers = Map.fromFoldable $ _.headers $ unwrap req
+      headerParam = reflectSymbol (SProxy :: _ vname)
+      spec = Proxy :: _ spec
 
 instance serverSegment :: 
   ( IsSymbol seg
