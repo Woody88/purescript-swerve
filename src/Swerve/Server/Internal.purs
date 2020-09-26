@@ -12,9 +12,14 @@ import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff)
+import Effect.Aff as Aff
 import Effect.Class.Console as Console
+import Effect.Ref as Ref
 import Network.HTTP.Types (hContentType)
-import Network.Wai (Response, pathInfo, responseStr)
+import Network.Wai (Request(..), Response, pathInfo, responseStr)
+import Node.Buffer as Buffer
+import Node.Encoding (Encoding(..))
+import Node.Stream as Stream
 import Partial.Unsafe (unsafeCrashWith)
 import Prim.Row as Row
 import Prim.Symbol as Symbol
@@ -25,9 +30,10 @@ import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.API.Capture (class ReadCapture, Capture, readCapture)
 import Swerve.API.Combinators (type (:>))
-import Swerve.API.ContentTypes (class AllCTRender, AcceptHeader(..), handleAcceptH)
+import Swerve.API.ContentTypes (class AllCTRender, class MimeUnrender, AcceptHeader(..), handleAcceptH, mimeUnrender)
 import Swerve.API.Header (class ReadHeader, Header, readHeader)
 import Swerve.API.Query (class ReadQuery, Query, readQuery)
+import Swerve.API.ReqBody (ReqBody)
 import Swerve.API.Resource (Resource)
 import Swerve.API.StatusCode (class HasStatus, StatusP(..), toStatus)
 import Swerve.API.Verb (class ReflectMethod, Verb, reflectMethod)
@@ -160,6 +166,29 @@ instance serverHeader ::
     where 
       headers = Map.fromFoldable $ _.headers $ unwrap req
       headerParam = reflectSymbol (SProxy :: _ vname)
+      spec = Proxy :: _ spec
+
+instance serverReqBody :: 
+  ( MimeUnrender ctypes a 
+  , Server PathEnd spec verb handler (body :: a | from ) (body :: a | to)
+  ) => Server PathEnd (ReqBody a ctypes :> spec) verb handler (body :: a | from ) (body :: a | to ) where
+  server api _ verb handler bldr req@(Request { body: Nothing }) resp = resp NotMatched
+  server api _ verb handler bldr req@(Request { body: Just stream }) resp = do 
+    bodyStr <- Aff.makeAff \done -> do
+      bufs <- Ref.new []
+      Stream.onData stream \buf ->
+        void $ Ref.modify (_ <> [buf]) bufs
+      Stream.onEnd stream do
+        body <- Ref.read bufs >>= Buffer.concat >>= Buffer.toString UTF8
+        done $ Right body
+      pure Aff.nonCanceler
+
+    case mimeUnrender (Proxy :: _ ctypes) bodyStr of 
+      Left e     -> resp NotMatched
+      Right body -> do
+          let bodyB = Builder.modify (SProxy :: _ "body") (const body)
+          server api spec verb handler (bodyB >>> bldr) req resp
+    where 
       spec = Proxy :: _ spec
 
 instance serverSegment :: 

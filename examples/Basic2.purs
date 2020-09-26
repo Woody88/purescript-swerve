@@ -12,23 +12,20 @@ import Swerve.API.Combinators (type (:>))
 import Swerve.API.Header (Header)
 import Swerve.API.MediaType (PlainText)
 import Swerve.API.Query (Query)
+import Swerve.API.ReqBody (ReqBody)
 import Swerve.API.Resource (Resource)
-import Swerve.API.Verb (Get)
+import Swerve.API.Verb (Get, Post)
 import Swerve.Server (swerve)
 import Type.Proxy (Proxy(..))
 
 type SomeAPI = GetSomeEndpoint
 
 type GetSomeEndpoint
-  =  Get "/endpoint/:id/:action?[minAge]&[maxAge]"
-  :> Capture "id" Int
-  :> Capture "action" String
-  :> Query "minAge" Int
-  :> Query "maxAge" Int
-  :> Header "name" String 
+  =  Post "/endpoint"
+  :> ReqBody String PlainText
   :> Resource String PlainText 
 
-getSomeEndpoint :: {capture :: { id :: Int, action :: String }, query :: { minAge :: Int, maxAge :: Int }, header :: { name :: String } } ->  Aff String 
+getSomeEndpoint :: { body :: String } ->  Aff String 
 getSomeEndpoint conn = do 
   Console.logShow conn
   pure "HelloWorld" 

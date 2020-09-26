@@ -5,6 +5,7 @@ import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.Header (Header)
 import Swerve.API.Query (Query)
+import Swerve.API.ReqBody (ReqBody)
 import Swerve.API.Resource (Resource)
 import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
@@ -12,6 +13,13 @@ import Type.Proxy (Proxy(..))
 class HasConn (api :: Type) (from :: Row Type) (to :: Row Type) | api -> from to
 
 instance hasConnResource :: HasConn (Resource a ctype) to to  
+
+instance hasConnReqBody :: 
+  ( Row.Cons "body" a from from' 
+  , HasConn api from' to_ 
+  , Row.Union from' to_ to' 
+  , Row.Nub to' to__ 
+  ) => HasConn (ReqBody a ct :> api) from to__ 
 
 instance hasConnCapture :: 
   ( CaptureAccum (Capture vname t :> api) () to
