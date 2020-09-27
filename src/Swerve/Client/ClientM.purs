@@ -3,6 +3,7 @@ module Swerve.Client.ClientM where
 import Prelude
 
 import Affjax as AX
+import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat as ResponseFormat
 import Control.Alt (class Alt)
 import Control.Monad.Error.Class (class MonadThrow)
@@ -11,11 +12,12 @@ import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, ru
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Data.String as String
+import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect)
 import Effect.Class.Console as Console
-import Network.Wai (responseStr)
+import Network.Wai (Request(..), responseStr)
 import Swerve.Client.Internal.RunClient (class RunClient, throwClientError)
 
 -- These two type synonyms will eventually change 
@@ -41,10 +43,11 @@ runClientM (ClientM cm) baseUrl = runExceptT $ flip runReaderT baseUrl $ cm
 
 instance runClientClientM :: RunClient ClientM where 
   throwClientError = throwError
-  runRequest req = do 
+  runRequest (Request req) = do 
     baseUrl <- ask
-    let url = String.joinWith "/" [baseUrl, ( _.url $ unwrap req)]
-    result <- liftAff $ AX.request $ AX.defaultRequest { url = url, responseFormat = ResponseFormat.string }
+    let url  = String.joinWith "/" [baseUrl, req.url]
+        hdrs = map (\(Tuple ck v) -> RequestHeader (unwrap ck) v) req.headers
+    result <- liftAff $ AX.request $ AX.defaultRequest { url = url, responseFormat = ResponseFormat.string, headers = hdrs }
     case result of 
       Left e -> throwClientError $ AX.printError e
       Right resp -> pure $ responseStr { code: unwrap resp.status, message: resp.statusText } [] resp.body

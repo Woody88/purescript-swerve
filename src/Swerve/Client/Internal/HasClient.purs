@@ -3,11 +3,15 @@ module Swerve.Client.Internal.HasClient where
 import Prelude
 
 import Control.Alt ((<|>))
+import Data.Array ((:))
 import Data.Array as Array
 import Data.Either (either)
 import Data.Maybe (fromMaybe)
+import Data.Newtype (wrap)
+import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Tuple.Nested ((/\))
 import Network.HTTP.Types as H
 import Network.Wai (Request(..), Response(..))
 import Prim.Row as Row
@@ -15,16 +19,20 @@ import Record as Record
 import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.ContentTypes (class MimeUnrender, mimeUnrender)
+import Swerve.API.Header (Header)
+import Swerve.API.Query (Query)
 import Swerve.API.Resource (Resource)
 import Swerve.API.Verb (class ReflectMethod, Verb, reflectMethod)
 import Swerve.Client.Internal.RunClient (class RunClient, runRequest, throwClientError)
 import Swerve.Server.Internal.HasConn (class HasConn)
-import Swerve.Server.Internal.Path (class Parse, CaptureVar, Segment)
+import Swerve.Server.Internal.Path (class Parse, CaptureVar, QueryVar, Segment)
 import Swerve.Server.InternalPathSub (class PathSub, PathEnd)
+import Type.Equality (class TypeEquals)
+import Type.Equality as Typequals
 import Type.Proxy (Proxy(..))
 
 class HasClient :: forall a. Type -> Row Type -> (a -> Type) -> a -> Constraint
-class HasClient api conn m a | api -> conn where 
+class HasClient api conn m a where 
   clientWithRoute :: Proxy api -> Record conn -> Request -> m a  
 
 instance hasClientVerb
@@ -43,12 +51,48 @@ class Client :: forall a. Type -> Type -> Row Type -> (a -> Type) -> a -> Constr
 class Client pathapi api conn m a | api -> conn where 
   clientRoute :: Proxy pathapi -> Proxy api -> Record conn -> Request -> m a 
 
-instance hasClientResource :: (RunClient m, MimeUnrender ctype a) =>  Client PathEnd (Resource a ctype) conn m a where 
+instance hasClientResource 
+  :: ( RunClient m
+     , MimeUnrender ctype a
+     , TypeEquals a' a) 
+  => Client PathEnd (Resource a' ctype) conn m a where 
   clientRoute _ _ _ req = do 
     response <- runRequest req 
     case response of 
-      ResponseString _ _ str -> either throwClientError pure $ mimeUnrender (Proxy :: _ ctype) str
+      ResponseString _ _ str -> either throwClientError pure $ (Typequals.to $ mimeUnrender (Proxy :: _ ctype) str)
       _ -> throwClientError "Bad Response type"
+
+instance hasClientHeader 
+  :: ( Client PathEnd api (header :: Record ctypes | conn) m a 
+     , Row.Cons hvar t r' ctypes 
+     , Show t 
+     , IsSymbol hvar) 
+  =>  Client PathEnd (Header hvar t :> api) (header :: Record ctypes | conn) m a where 
+  clientRoute _ _ conn (Request req) = clientRoute (Proxy :: _ PathEnd) (Proxy :: _ api) conn newReq 
+    where 
+      hvarP  = (SProxy :: _ hvar)
+      hkey   = wrap $ reflectSymbol hvarP
+      header = Record.get (SProxy :: _ "header") conn 
+      hval   = show $ Record.get hvarP header
+      hdrs   = (hkey /\ hval) : req.headers 
+      newReq = Request (req { headers = hdrs })
+
+instance hasClientQuery 
+  :: ( Client pathapi api (query :: Record ctypes | conn) m a 
+     , Row.Cons qvar t r' ctypes 
+     , Show t 
+     , IsSymbol qvar) 
+  =>  Client (QueryVar qvar :> pathapi) (Query qvar t :> api) (query :: Record ctypes | conn) m a where 
+  clientRoute _ _ conn (Request req) = clientRoute (Proxy :: _ pathapi) (Proxy :: _ api) conn newReq 
+    where 
+      qvarP    = (SProxy :: _ qvar)
+      qvarStr  = reflectSymbol qvarP
+      query = Record.get (SProxy :: _ "query") conn 
+      qval    = show $ Record.get qvarP query
+      url' =  case String.contains (Pattern "?") req.url of 
+        false -> String.joinWith "" [req.url, "?", qvarStr, "=", qval]
+        true  -> String.joinWith "" [req.url, "&", qvarStr, "=", qval]
+      newReq  = Request (req { url = url' })
 
 instance hasClientCapture 
   :: ( Client pathapi api (capture :: Record ctypes | conn) m a 
