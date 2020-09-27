@@ -4,7 +4,8 @@ You can edit this file as you like.
 -}
 { name = "purescript-swerve"
 , dependencies =
-  [ "console"
+  [ "affjax"
+  , "console"
   , "effect"
   , "form-urlencoded"
   , "heterogeneous"
