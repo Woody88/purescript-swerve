@@ -2,25 +2,28 @@ module Swerve.Client.Internal.HasClient where
 
 import Prelude
 
-import Control.Alt ((<|>))
 import Data.Array ((:))
 import Data.Array as Array
 import Data.Either (either)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (wrap)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Tuple.Nested ((/\))
+import Effect (Effect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Network.HTTP.Types as H
 import Network.Wai (Request(..), Response(..))
+import Node.Stream (Readable)
 import Prim.Row as Row
 import Record as Record
 import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
-import Swerve.API.ContentTypes (class MimeUnrender, mimeUnrender)
+import Swerve.API.ContentTypes (class MimeRender, class MimeUnrender, mimeRender, mimeUnrender)
 import Swerve.API.Header (Header)
 import Swerve.API.Query (Query)
+import Swerve.API.ReqBody (ReqBody)
 import Swerve.API.Resource (Resource)
 import Swerve.API.Verb (class ReflectMethod, Verb, reflectMethod)
 import Swerve.Client.Internal.RunClient (class RunClient, runRequest, throwClientError)
@@ -61,6 +64,18 @@ instance hasClientResource
     case response of 
       ResponseString _ _ str -> either throwClientError pure $ (Typequals.to $ mimeUnrender (Proxy :: _ ctype) str)
       _ -> throwClientError "Bad Response type"
+
+instance hasClientReqBody
+  :: ( Client PathEnd api (body :: b | conn) m a 
+     , MonadEffect m
+     , Row.Cons "body" b r' ctypes 
+     , MimeRender ctype b ) 
+  =>  Client PathEnd (ReqBody b ctype :> api) (body :: b | conn) m a where 
+  clientRoute _ _ conn (Request req) = do 
+    stream <- liftEffect $ toStream $ mimeRender (Proxy :: _ ctype) body
+    clientRoute (Proxy :: _ PathEnd) (Proxy :: _ api) conn (Request (req { body = Just stream }))
+    where 
+      body = Record.get (SProxy :: _ "body") conn 
 
 instance hasClientHeader 
   :: ( Client PathEnd api (header :: Record ctypes | conn) m a 
@@ -117,3 +132,6 @@ instance hasClientSegment
       segment = reflectSymbol (SProxy :: _ seg)
       url' = String.joinWith "/"  $ Array.filter (\v -> (not $ String.null v) && (not $ eq v "/") ) [req.url, segment]
       newReq  = Request (req { url =  url' })
+
+
+foreign import toStream :: String -> Effect (Readable ())

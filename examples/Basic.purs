@@ -28,13 +28,14 @@ import Type.Proxy (Proxy(..))
 type SomeAPI = GetSomeEndpoint
 
 type GetSomeEndpoint
-  = Get "/endpoint/:id?[maxAge]"
+  = Post "/endpoint/:id?[maxAge]"
   :> Capture "id" Int 
   :> Query "maxAge" Int
   :> Header "token" String
+  :> ReqBody String PlainText 
   :> Resource String PlainText 
 
-getSomeEndpoint :: {capture :: { id :: Int }, query :: {maxAge :: Int}, header :: {token :: String}} -> Aff String
+getSomeEndpoint :: {capture :: { id :: Int }, query :: {maxAge :: Int}, header :: {token :: String}, body :: String} -> Aff String
 getSomeEndpoint conn = pure $ 
     "Hello, Endpoint " <> 
     show conn.capture.id <> 
@@ -42,6 +43,8 @@ getSomeEndpoint conn = pure $
     show conn.query.maxAge <> 
     " with token: " <>
     conn.header.token <>
+    "with body: " <> 
+    conn.body <>
     "!"
 
 api = getSomeEndpoint 
