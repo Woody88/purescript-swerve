@@ -15,7 +15,7 @@ import Network.Warp (defaultSettings, runSettings)
 import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.Guard (Guard)
-import Swerve.API.Header (Header)
+import Swerve.API.Header (Header, Headers(..), withHeaders)
 import Swerve.API.MediaType (PlainText)
 import Swerve.API.Query (Query)
 import Swerve.API.Raw (Raw)
@@ -30,12 +30,14 @@ type ApiKey = String
 type SomeAPI = Guard "apiKey" ApiKey :> GetSomeEndpoint
 
 type GetSomeEndpoint
-  = Raw "/endpoint"
+  = Get "/endpoint/:id"
+  :> Capture "id" Int 
+  :> Resource (Headers (token :: String) String) PlainText 
 
-getSomeEndpoint :: ApiKey -> Application
-getSomeEndpoint apikey req send = do 
+getSomeEndpoint :: ApiKey -> {capture :: {id :: Int}} -> Aff (Headers (token :: String) String)
+getSomeEndpoint apikey conn = do 
   Console.log $ "key: " <> apikey
-  send $ responseStr ok200 [] "Hello, world!"
+  pure $ withHeaders {token: apikey} "Hello, world!"
 
 api = getSomeEndpoint 
 

@@ -5,17 +5,18 @@ import Prelude
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap, wrap)
 import Data.String as String
+import Data.String.CaseInsensitive (CaseInsensitiveString)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Data.Tuple (fst, snd)
+import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
-import Effect.Class.Console as Console
 import Effect.Ref as Ref
-import Network.HTTP.Types (hContentType)
+import Heterogeneous.Folding (class HFoldlWithIndex)
+import Network.HTTP.Types (hAccept, hContentType)
 import Network.Wai (Request(..), Response, pathInfo, responseStr)
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
@@ -32,7 +33,7 @@ import Swerve.API.Capture (class ReadCapture, Capture, readCapture)
 import Swerve.API.Combinators (type (:>))
 import Swerve.API.ContentTypes (class AllCTRender, class MimeUnrender, AcceptHeader(..), handleAcceptH, mimeUnrender)
 import Swerve.API.Guard (Guard)
-import Swerve.API.Header (class ReadHeader, Header, readHeader)
+import Swerve.API.Header (class ReadHeader, Header, Headers(..), readHeader)
 import Swerve.API.Query (class ReadQuery, Query, readQuery)
 import Swerve.API.Raw (Raw')
 import Swerve.API.ReqBody (ReqBody)
@@ -45,7 +46,7 @@ import Swerve.Server.Internal.Path (class Parse, CaptureVar, QueryVar, Segment)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.RoutingApplication (RoutingApplication)
 import Swerve.Server.InternalPathSub (class PathSub, PathEnd)
-import Swerve.Utils (queryInfo)
+import Swerve.Utils (HeadersUnfold, headersToUnfoldable, queryInfo)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -96,14 +97,28 @@ instance serverRaw ::
   Server PathEnd (Resource Unit Unit) (Raw' path) ctx (Request -> (Response -> Aff Unit) -> Aff Unit) to to where 
   server _ _ _ _ handler bldr req resp = handler req (resp <<< Matched)
 
-instance serverResource :: 
+instance serverResourceHeader :: 
+  ( AllCTRender ctype a 
+  , HasStatus status
+  , HFoldlWithIndex HeadersUnfold Unit { | hdrs } (Array (Tuple CaseInsensitiveString String))
+  ) => Server PathEnd (Resource (Headers hdrs a) ctype) (Verb method status path) ctx (Record to -> Aff (Headers hdrs a)) to to where 
+  server _ _ _ _ handler bldr req resp = do 
+    let (conn :: Record to)  = Builder.build bldr $ unsafeCoerce {}  -- what can I do about this?
+    (Headers headers resource)  <- handler conn
+    let hdrs = headersToUnfoldable headers
+    case handleAcceptH (Proxy :: _ ctype) (getAcceptHeader req) resource of
+      Nothing -> resp NotMatched
+      Just (ct /\ body) -> do 
+        resp $ Matched $ responseStr (toStatus (StatusP :: _ status)) (hdrs <> [hContentType /\ ct]) body
+
+else instance serverResource :: 
   ( AllCTRender ctype a 
   , HasStatus status
   ) => Server PathEnd (Resource a ctype) (Verb method status path) ctx (Record to -> Aff a) to to where 
   server _ _ _ _ handler bldr req resp = do 
     let (conn :: Record to)  = Builder.build bldr $ unsafeCoerce {}  -- what can I do about this?
     resource <- handler conn
-    case handleAcceptH (Proxy :: _ ctype) (AcceptHeader "*/*") resource of
+    case handleAcceptH (Proxy :: _ ctype) (getAcceptHeader req) resource of
       Nothing -> resp NotMatched
       Just (ct /\ body) -> do 
         resp $ Matched $ responseStr (toStatus (StatusP :: _ status)) [hContentType /\ ct] body
@@ -124,7 +139,6 @@ instance serverCapture ::
         Just (val :: t) -> do 
           let rec = Record.insert (SProxy :: _ vname) val {}
               captureB = Builder.modify (SProxy :: _ "capture") (Record.merge rec)
-          Console.logShow $ _.url $ unwrap (req' var 1)
           server api spec verb ctx handler (captureB >>> bldr) (req' var 1) resp
     where 
       api = Proxy :: _ api
@@ -233,3 +247,10 @@ instance serverSegment ::
       seg = reflectSymbol (SProxy :: _ seg)
       r = unwrap req
       req' n = wrap $ r { url = String.drop ((String.length seg) + n)  r.url }
+
+
+getAcceptHeader :: Request -> AcceptHeader
+getAcceptHeader = AcceptHeader <<< fromMaybe ct_wildcard <<< Map.lookup hAccept <<< Map.fromFoldable <<< _.headers <<< unwrap
+
+ct_wildcard :: String
+ct_wildcard = "*" <> "/" <> "*"
