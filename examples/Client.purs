@@ -2,11 +2,13 @@ module Examples.Client where
 
 import Prelude
 
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class.Console as Console
 import Swerve.API.Capture (Capture)
 import Swerve.API.Combinators (type (:>))
+import Swerve.API.Guard (Guard)
 import Swerve.API.Header (Header)
 import Swerve.API.MediaType (PlainText)
 import Swerve.API.Query (Query)
@@ -19,15 +21,17 @@ import Swerve.Client.Internal.HasClient (class HasClient)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 
-type GetSomeEndpoint
-  = Post "/endpoint/:id?[maxAge]"
-  :> Capture "id" Int
-  :> Query "maxAge" Int
-  :> Header "token" String
-  :> ReqBody String PlainText
-  :> Resource String PlainText
+type ApiKey = Tuple String String 
 
-getUser :: ClientM String 
+type GetSomeEndpoint
+ = Post "/user/:id?[maxAge]"
+ :> Capture "id" Int 
+ :> Query "maxAge" Int 
+ :> Header "token" String 
+ :> ReqBody String PlainText
+ :> Resource String PlainText 
+
+getUser :: ClientM String
 getUser = client (Proxy :: _ GetSomeEndpoint) {capture: {id: 13}, query: {maxAge: 30}, header: {token: "x123dsa4!%dsa&"}, body: "Hello, World"}
 
 main :: Effect Unit 

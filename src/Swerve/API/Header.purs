@@ -1,9 +1,12 @@
 module Swerve.API.Header where 
 
-import Prelude 
+import Prelude
 
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
+import Data.Newtype (wrap)
+import Data.Tuple (Tuple(..))
+import Network.HTTP.Types as H
 
 data Header (var :: Symbol) (t :: Type)  
 
@@ -29,3 +32,9 @@ instance toHeaderInt :: ToHeader Int where
 
 withHeaders :: forall hdrs t. Record hdrs -> t -> Headers hdrs t 
 withHeaders = Headers 
+
+class IsHeader a where 
+  mkHeader :: a -> H.Header
+
+instance isHeaderTuple :: IsHeader (Tuple String String) where 
+  mkHeader (Tuple k v) = Tuple (wrap k) v 
