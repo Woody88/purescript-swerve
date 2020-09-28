@@ -13,7 +13,7 @@ import Network.HTTP.Types (ok200)
 import Network.Wai (Application, Request(..), responseStr)
 import Network.Warp (defaultSettings, runSettings)
 import Swerve.API.Capture (Capture)
-import Swerve.API.Combinators (type (:>))
+import Swerve.API.Combinators (type (:>), type (:<|>), (:<|>))
 import Swerve.API.Guard (Guard)
 import Swerve.API.Header (Header, Headers(..), withHeaders)
 import Swerve.API.MediaType (PlainText)
@@ -25,11 +25,10 @@ import Swerve.API.Verb (Get, Post)
 import Swerve.Server (swerve, swerveContext)
 import Type.Proxy (Proxy(..))
 
-type SomeAPI = GetSomeEndpoint
+type SomeAPI = GetSomeEndpoint :<|> Raw "/raw"
 
 type GetSomeEndpoint
  =  Get "/user"
- :> Header "shigeta-san" String 
  :> Resource String PlainText 
  
 -- type GetSomeEndpoint
@@ -52,12 +51,15 @@ type GetSomeEndpoint
 --     conn.body <>
 --     "!"
 
-getSomeEndpoint :: {header :: { "shigeta-san" :: String }} -> Aff String 
+getSomeEndpoint :: {} -> Aff String 
 getSomeEndpoint conn = do
   Console.logShow conn 
   pure "Hello, World!"
 
-api = getSomeEndpoint 
+getSomeApplication :: Application 
+getSomeApplication req send = send $ responseStr ok200 [] "Yo!" 
+
+api = getSomeEndpoint :<|> getSomeApplication
 
 app :: Application
 app = swerve (Proxy :: _ SomeAPI) api

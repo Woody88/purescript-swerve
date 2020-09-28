@@ -26,13 +26,13 @@ type ApiKey = Tuple String String
 type GetSomeEndpoint
  = Post "/user/:id?[maxAge]"
  :> Capture "id" Int 
- :> Query "maxAge" Int 
+ :> Query "maxAge" String
  :> Header "token" String 
  :> ReqBody String PlainText
  :> Resource String PlainText 
 
 getUser :: ClientM String
-getUser = client (Proxy :: _ GetSomeEndpoint) {capture: {id: 13}, query: {maxAge: 30}, header: {token: "x123dsa4!%dsa&"}, body: "Hello, World"}
+getUser = client (Proxy :: _ GetSomeEndpoint) {capture: {id: 13}, query: {maxAge: "30"}, header: {token: "x123dsa4!%dsa&"}, body: "Hello, World"}
 
 main :: Effect Unit 
 main = launchAff_ do 

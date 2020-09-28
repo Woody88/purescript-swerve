@@ -13,7 +13,7 @@ import Network.HTTP.Types (ok200)
 import Network.Wai (Application, Request(..), responseStr)
 import Network.Warp (defaultSettings, runSettings)
 import Swerve.API.Capture (Capture)
-import Swerve.API.Combinators (type (:>))
+import Swerve.API.Combinators (type (:>), type (:<|>), (:<|>))
 import Swerve.API.Guard (Guard)
 import Swerve.API.Header (Header, Headers(..), withHeaders)
 import Swerve.API.MediaType (PlainText)
@@ -27,19 +27,26 @@ import Type.Proxy (Proxy(..))
 
 type ApiKey = String 
 
-type SomeAPI = Guard "apiKey" ApiKey :> GetSomeEndpoint
+type SomeAPI = UserAPI :<|> Raw "/raw"
+
+type UserAPI = Guard "apiKey" ApiKey :> GetSomeEndpoint 
 
 type GetSomeEndpoint
-  = Get "/endpoint/:id"
-  :> Capture "id" Int 
-  :> Resource (Headers (token :: String) String) PlainText 
+ = Post "/user/:id?[maxAge]"
+ :> Capture "id" Int 
+ :> Query "maxAge" Int 
+ :> ReqBody String PlainText
+ :> Resource (Headers (token :: String) String) PlainText 
 
-getSomeEndpoint :: ApiKey -> {capture :: {id :: Int}} -> Aff (Headers (token :: String) String)
+getSomeEndpoint :: ApiKey -> {capture :: {id :: Int}, query :: {maxAge :: Int }, body :: String } -> Aff (Headers (token :: String) String)
 getSomeEndpoint apikey conn = do 
   Console.log $ "key: " <> apikey
   pure $ withHeaders {token: apikey} "Hello, world!"
 
-api = getSomeEndpoint 
+endpointRaw :: Application
+endpointRaw req send = send $ responseStr ok200 [] "Rawww!"
+
+api = getSomeEndpoint :<|> endpointRaw
 
 apiKey :: Request -> Aff (Either String ApiKey)
 apiKey (Request req) = pure $ case apiKey' of 

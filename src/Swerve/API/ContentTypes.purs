@@ -15,7 +15,7 @@ import Network.HTTP.Media (MediaType, (//))
 import Prim.TypeError as TE
 import Simple.JSON (class WriteForeign)
 import Simple.JSON as Json
-import Swerve.API.Combinators (type (<|>))
+import Swerve.API.Combinators (type (:<|>))
 import Swerve.API.MediaType (JSON, PlainText, FormUrlEncoded)
 import Type.Proxy (Proxy(..))
 
@@ -73,7 +73,7 @@ instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncoded wh
 class AllMime ctypes where 
     allMime :: Proxy ctypes -> Array MediaType 
 
-instance allMimeAlt :: (AllMime ctypes, Accepts ctype, Accepts ctypes)  => AllMime (ctype <|> ctypes) where 
+instance allMimeAlt :: (AllMime ctypes, Accepts ctype, Accepts ctypes)  => AllMime (ctype :<|> ctypes) where 
     allMime _ =  Array.cons (contentType pctype) $ allMime pctypes
         where 
             pctype  = Proxy :: Proxy ctype 
@@ -91,7 +91,7 @@ instance allMimeAltNoContent :: (AllMime ctypes) => AllMimeRender ctypes NoConte
         where 
             pxys = Proxy :: Proxy ctypes  
 
-else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accepts ctype, MimeRender ctype a) => AllMimeRender (ctype <|> ctypes) a where 
+else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accepts ctype, MimeRender ctype a) => AllMimeRender (ctype :<|> ctypes) a where 
     allMimeRender _ x = Array.cons (Tuple (contentType pxy) (mimeRender pxy x)) $ allMimeRender pxys x
         where 
             pxy  = Proxy :: Proxy ctype 
