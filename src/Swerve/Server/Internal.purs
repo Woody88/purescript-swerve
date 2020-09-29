@@ -52,7 +52,7 @@ import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 class HasServer :: forall k. k -> Row Type -> Type -> Constraint
-class HasServer api context handler where 
+class HasServer api context handler | api context -> handler where 
   route :: Proxy api -> Record context -> handler -> RoutingApplication Response
 
 instance hasServerAlt ::

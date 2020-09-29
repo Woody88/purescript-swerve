@@ -27,9 +27,10 @@ import Type.Proxy (Proxy(..))
 
 type ApiKey = String 
 
-type SomeAPI = UserAPI :<|> Raw "/raw"
+type SomeAPI = Guard "apiKey" ApiKey :> (UserAPI :<|> Raw "/raw")
 
-type UserAPI = Guard "apiKey" ApiKey :> GetSomeEndpoint 
+type UserAPI = GetSomeEndpoint 
+type UserHandlers = GetSomeEndpointHandler :<|> Application 
 
 type GetSomeEndpoint
  = Post "/user/:id?[maxAge]"
@@ -38,15 +39,18 @@ type GetSomeEndpoint
  :> ReqBody String PlainText
  :> Resource (Headers (token :: String) String) PlainText 
 
-getSomeEndpoint :: ApiKey -> {capture :: {id :: Int}, query :: {maxAge :: Int }, body :: String } -> Aff (Headers (token :: String) String)
-getSomeEndpoint apikey conn = do 
-  Console.log $ "key: " <> apikey
-  pure $ withHeaders {token: apikey} "Hello, world!"
+type GetSomeEndpointHandler = {capture :: {id :: Int}, query :: {maxAge :: Int }, body :: String } -> Aff (Headers (token :: String) String) 
+
+getSomeEndpoint :: {capture :: {id :: Int}, query :: {maxAge :: Int }, body :: String } -> Aff (Headers (token :: String) String)
+getSomeEndpoint conn = do 
+  -- Console.log $ "key: " <> apikey
+  pure $ withHeaders {token: "apikey"} "Hello, world!"
 
 endpointRaw :: Application
 endpointRaw req send = send $ responseStr ok200 [] "Rawww!"
 
-api = getSomeEndpoint :<|> endpointRaw
+api :: ApiKey -> UserHandlers 
+api apikey = getSomeEndpoint :<|> endpointRaw
 
 apiKey :: Request -> Aff (Either String ApiKey)
 apiKey (Request req) = pure $ case apiKey' of 
