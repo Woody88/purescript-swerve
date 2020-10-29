@@ -1,4 +1,4 @@
-module Swerve.Server.Router where
+module Swerve.Server.Internal.Router where
 
 import Prelude
 
@@ -11,9 +11,9 @@ import Data.Newtype (unwrap, wrap)
 import Data.String as String
 import Data.Tuple.Nested (type (/\), (/\))
 import Network.Wai (Response, pathInfo)
-import Swerve.Server.ErrorFormatter (NotFoundErrorFormatter)
-import Swerve.Server.RouteResult (RouteResult(..))
-import Swerve.Server.RoutingApplication (RoutingApplication)
+import Swerve.Server.Internal.ErrorFormatter (NotFoundErrorFormatter)
+import Swerve.Server.Internal.RouteResult (RouteResult(..))
+import Swerve.Server.Internal.RoutingApplication (RoutingApplication)
 
 type Router env = Router' env RoutingApplication
 

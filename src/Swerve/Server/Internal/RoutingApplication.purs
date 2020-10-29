@@ -1,11 +1,11 @@
-module Swerve.Server.RoutingApplication where
+module Swerve.Server.Internal.RoutingApplication where
 
 import Prelude
 
 import Effect.Aff (Aff)
 import Network.Wai (Application, Request, Response)
-import Swerve.Server.RouteResult (RouteResult(..))
-import Swerve.Server.ServerError (responseServerError)
+import Swerve.Server.Internal.RouteResult (RouteResult(..))
+import Swerve.Server.Internal.ServerError (responseServerError)
 
 type RoutingApplication = Request -> (RouteResult Response -> Aff Unit) -> Aff Unit
 

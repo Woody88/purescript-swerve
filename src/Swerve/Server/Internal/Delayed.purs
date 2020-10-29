@@ -1,4 +1,4 @@
-module Server.Delayed where
+module Swerve.Server.Internal.Delayed where
 
 import Prelude
 
@@ -10,9 +10,9 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console as Console
 import Network.Wai (Request, Response)
-import Swerve.Server.DelayedIO (DelayedIO, liftRouteResult, runDelayedIO)
-import Swerve.Server.Response (Response) as Resp
-import Swerve.Server.RouteResult (RouteResult(..))
+import Swerve.Server.Internal.DelayedIO (DelayedIO, liftRouteResult, runDelayedIO)
+import Swerve.Server.Internal.Response (Response) as Resp
+import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 data Delayed :: forall k. k -> Type -> Type
