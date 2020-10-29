@@ -5,6 +5,7 @@ You can edit this file as you like.
 { name = "purescript-swerve"
 , dependencies =
   [ "console"
+  , "debugged"
   , "effect"
   , "form-urlencoded"
   , "http-media"

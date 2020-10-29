@@ -166,9 +166,9 @@ let additions =
             , "enums"
             ]
         , repo =
-            "https://github.com/hdgarrood/purescript-debugged.git"
+            "https://github.com/Woody88/purescript-debugged.git"
         , version =
-            "master"
+            "ps-0.14"
         } 
     , wai =
         { dependencies =
