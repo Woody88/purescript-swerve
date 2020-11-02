@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
 import Data.String as String
 import Data.Tuple.Nested (type (/\), (/\))
-import Network.Wai (Response, pathInfo)
+import Network.Wai (Response)
 import Swerve.Server.Internal.ErrorFormatter (NotFoundErrorFormatter)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.RoutingApplication (RoutingApplication)
@@ -62,25 +62,22 @@ runRouterEnv :: forall env. NotFoundErrorFormatter -> Router env -> env -> Routi
 runRouterEnv fmt router env request respond  =
   case router of
     StaticRouter table ls ->
-      case pathInfo request of
+      case _.pathInfo $ unwrap request of
         []   -> runChoice fmt ls env request respond
-        -- This case is to handle trailing slashes.
-        -- [""] -> runChoice fmt ls env request respond
         arr | Just {head: first, tail: rest}  <- Array.uncons arr 
             , Just router'                   <- M.lookup first table
-            ->  let request' = wrap $  _ { url = String.joinWith "/" rest } $ unwrap request 
+            ->  let request' = wrap $  _ { pathInfo = rest } $ unwrap request 
                 in  runRouterEnv fmt router' env request' respond
         _ -> respond $ Fail $ fmt request
     CaptureRouter router' ->
-      case pathInfo request of
+      case _.pathInfo $ unwrap request of
         arr | Just {head: first, tail: rest}  <- Array.uncons arr 
-            ->  let request' = wrap $  _ { url = String.joinWith "/" rest } $ unwrap request 
+            ->  let request' = wrap $  _ { pathInfo = rest } $ unwrap request 
                 in  runRouterEnv fmt router' (first /\ env) request' respond
         otherwise -> respond $ Fail $ fmt request
-        -- This case is to handle trailing slashes.
     CaptureAllRouter router' ->
-      let segments = pathInfo request
-          request' = wrap $  _ { url = "" } $ unwrap request 
+      let segments = _.pathInfo $ unwrap request
+          request' = wrap $  _ { pathInfo = [] } $ unwrap request 
       in runRouterEnv fmt router' (segments /\ env) request' respond
     RawRouter app ->
       app env request respond

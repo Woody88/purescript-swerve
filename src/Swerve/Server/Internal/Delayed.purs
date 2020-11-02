@@ -9,7 +9,7 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console as Console
-import Network.Wai (Request, Response)
+import Network.Wai (Request(..), Response)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, liftRouteResult, runDelayedIO)
 import Swerve.Server.Internal.Response (Response) as Resp
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
@@ -76,6 +76,17 @@ addCapture delayed new =
                     , server   = \(Tuple x v) p h a b req -> (applyFlipped v) <$> (server x p h a b req)
                     }
 
+addParameterCheck :: forall env a b. 
+  Delayed env (a -> b)
+  -> DelayedIO a
+  -> Delayed env b
+addParameterCheck delayed new =
+  delayed 
+    # unDelayed \d@{ params, server} -> 
+        mkDelayed d { params  = Tuple <$> params <*> new
+                    , server  = \ c (Tuple p pNew) h a b req -> (applyFlipped pNew) <$> server c p h a b req
+                    }
+
 addAuthCheck :: forall env a b. 
   Delayed env (a -> b)
   -> DelayedIO a
@@ -96,9 +107,8 @@ runDelayed d env =
     d 
     # unDelayed \delayed ->
         runDelayedIO $ do
-          liftAff $Console.log "in"
           r <- ask
-          c <- delayed.captures env
+          c <- delayed.captures env 
           delayed.method
           a <- delayed.auth
           delayed.accept

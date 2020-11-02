@@ -1,0 +1,27 @@
+{
+  "name": "purescript-swerve",
+  "version": "1.0.0",
+  "description": "Swerve is a type-level server and client library heavily inspired by Haskell's Servant library.  A major, difference is the use of row types instead of introducing numerous combinators.",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Woody88/purescript-swerve.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Woody88/purescript-swerve/issues"
+  },
+  "homepage": "https://github.com/Woody88/purescript-swerve#readme",
+  "dependencies": {
+    "xhr2": "^0.2.0"
+  }
+}

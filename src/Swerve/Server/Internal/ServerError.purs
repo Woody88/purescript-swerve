@@ -17,3 +17,9 @@ err404 = { content: ""
          , headers: []
          , status: H.notFound404
          }
+
+err400 :: ServerError
+err400 = { content: ""
+         , headers: []
+         , status: H.badRequest400
+         }
