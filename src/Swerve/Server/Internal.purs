@@ -5,7 +5,7 @@ import Prelude
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (unwrap, wrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
 import Effect.Class.Console as Console
@@ -14,10 +14,11 @@ import Network.Wai as Wai
 import Prim.RowList (class RowToList)
 import Simple.JSON (class WriteForeign, writeJSON)
 import Swerve.API.Capture (class ReadCapture, readCapture)
+import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus, getStatus)
-import Swerve.API.Types (type (:>), Capture, QueryParam, Spec, Verb)
-import Swerve.Server.Internal.Delayed (Delayed, addCapture, addParameterCheck, emptyDelayed, runAction)
+import Swerve.API.Types (type (:>), Capture, Header, QueryParam, Spec, Verb)
+import Swerve.Server.Internal.Delayed (Delayed, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction)
 import Swerve.Server.Internal.DelayedIO (delayedFail, withRequest)
 import Swerve.Server.Internal.Response (class VariantResponse, Response(..), variantResponse)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
@@ -38,6 +39,7 @@ class EvalServer server handler | server -> handler
 instance evalServerVerb :: EvalServer (Server' (Verb status a hdrs ctypes row) Aff) (Aff (Response row a))
 instance evalServerCapture  ::  EvalServer (Server' (Capture a :> api) Aff) (a -> Server' api Aff)
 instance evalServerQueryParam  ::  IsSymbol sym => EvalServer (Server' (QueryParam sym a :> api) Aff) (Maybe a -> Server' api Aff)
+instance evalServerHeader  ::  IsSymbol sym => EvalServer (Server' (Header sym a :> api) Aff) (a -> Server' api Aff)
 instance evalServerSeg  :: IsSymbol path => EvalServer (Server' (path :> api) Aff) (Server' api Aff)
 
 class HasServer api context handler | api -> context handler where 
@@ -69,13 +71,27 @@ instance hasServerCapture ::
             Nothing           -> delayedFail err400 
             Just (piece :: a) -> pure piece)
 
+instance hasServerHeader :: 
+  ( IsSymbol sym
+  , ReadHeader a
+  , HasServer api context handler
+  ) => HasServer (Header sym a :> api) context (a -> handler) where 
+  route _ ctx subserver = route (Proxy :: _ api) ctx delayed
+    where 
+      delayed = addHeaderCheck (toHandler subserver) <<< withRequest $ 
+        \(Request req) -> let 
+          key = reflectSymbol (SProxy :: _ sym)
+          hMap = Map.fromFoldable $ req.headers 
+          in case Map.lookup (wrap key) hMap >>= readHeader of 
+            Nothing -> delayedFail err400 { content = req.url }
+            Just piece -> pure piece
+
 instance hasServerQuery :: 
   ( IsSymbol sym
   , ReadQuery a
   , HasServer api context handler
   ) => HasServer (QueryParam sym a :> api) context (Maybe a -> handler) where 
   route _ ctx subserver = route (Proxy :: _ api) ctx delayed
-  
     where 
       delayed = addParameterCheck (toHandler subserver) <<< withRequest $ 
         \(Request req) -> let 

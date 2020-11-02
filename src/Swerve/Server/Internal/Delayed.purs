@@ -87,6 +87,17 @@ addParameterCheck delayed new =
                     , server  = \ c (Tuple p pNew) h a b req -> (applyFlipped pNew) <$> server c p h a b req
                     }
 
+addHeaderCheck :: forall env a b. 
+  Delayed env (a -> b)
+  -> DelayedIO a
+  -> Delayed env b
+addHeaderCheck delayed new =
+  delayed 
+    # unDelayed \d@{ headers, server} -> 
+        mkDelayed d { headers  = Tuple <$> headers <*> new
+                    , server  = \ c p (Tuple h hNew) a b req -> (applyFlipped hNew) <$> server c p h a b req
+                    }
+
 addAuthCheck :: forall env a b. 
   Delayed env (a -> b)
   -> DelayedIO a

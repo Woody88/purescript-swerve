@@ -13,7 +13,7 @@ import Effect.Class (liftEffect)
 import Network.Wai (Application, Response(..), defaultRequest) as Wai
 import Network.Wai (responseStr)
 import Swerve.API.ContentType (JSON)
-import Swerve.API.Types (type (:>), Capture, QueryParam)
+import Swerve.API.Types (type (:>), Capture, Header, QueryParam)
 import Swerve.API.Verb (Get)
 import Swerve.Server.Internal (Server, serve)
 import Swerve.Server.Internal (from) as Server
@@ -27,12 +27,12 @@ import Type.Proxy (Proxy(..))
 type User = String
 type UserId = Int  
 type MaxAge = Int 
+type Authorization = String 
 
-type GetUser = "users" :> Capture UserId :> QueryParam "maxAge" MaxAge :> Get User JSON
+type GetUser = "users" :> Capture UserId :> QueryParam "maxAge" MaxAge :> Header "authorization" Authorization :> Get User JSON
 
-
-getUser :: UserId -> Maybe MaxAge -> Aff (Response _ User) 
-getUser _ _ = pure $ pure "Woody"
+getUser :: UserId -> Maybe MaxAge -> Authorization -> Aff (Response _ User) 
+getUser _ _ _ = pure $ pure "Woody"
 
 server :: Server GetUser 
 server = Server.from getUser
