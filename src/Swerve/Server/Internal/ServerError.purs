@@ -23,3 +23,15 @@ err400 = { content: ""
          , headers: []
          , status: H.badRequest400
          }
+
+err415 :: ServerError
+err415 = { content: ""
+         , headers: []
+         , status: H.unsupportedMediaType415
+         }
+
+err500 :: ServerError
+err500 = { content: ""
+         , headers: []
+         , status: H.internalServerError500
+         }

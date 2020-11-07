@@ -109,6 +109,19 @@ addAuthCheck delayed new =
                     , server   = \ c p h (Tuple y v) b req -> (applyFlipped v) <$> server c p h y b req
                     }
 
+addBodyCheck :: forall env a b ctype. 
+  Delayed env (a -> b)
+  -> DelayedIO ctype         -- ^ content type check
+  -> (ctype -> DelayedIO a)  -- ^ body check
+  -> Delayed env b
+addBodyCheck delayed newContent newBody =
+  delayed 
+    # unDelayed \d@{ content, body, server} -> 
+        mkDelayed d { content = Tuple <$> content <*> newContent 
+                    , body    = \(Tuple ctype c) -> Tuple <$> body ctype <*> newBody c 
+                    , server  = \c p h a (Tuple b newB) req -> (applyFlipped newB) <$> server c p h a b req 
+                    }
+
 runDelayed :: forall a env.
   Delayed env a
   -> env

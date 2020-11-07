@@ -21,8 +21,8 @@ import Type.Proxy (Proxy(..))
 newtype Response (row :: Row Type) a = Response (Either (Variant row) a)
 
 derive newtype instance functorResponse :: Functor (Response row)
-derive newtype instance applyResponse :: Apply (Response row)
-derive newtype instance applicativeResponse :: Applicative (Response row)
+-- derive newtype instance applyResponse :: Apply (Response row)
+-- derive newtype instance applicativeResponse :: Applicative (Response row)
 
 newtype Respond (content :: Type) (headers :: Headers) (ctypes :: ContentType)
   = Respond { content :: content 
@@ -51,3 +51,6 @@ instance variantResponseCons ::
     where 
       label = SProxy :: _ label 
       tail = Proxy :: _ tail 
+
+respond :: forall a row. a -> Response row a 
+respond = Response <<< pure

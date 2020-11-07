@@ -19,3 +19,4 @@ foreign import data Capture :: Type -> Spec
 foreign import data QueryParam :: Symbol -> Type -> Spec
 foreign import data Header :: Symbol -> Type -> Spec 
 foreign import data Verb :: Status -> Type -> Headers -> ContentType -> OtherResponse -> Spec
+foreign import data ReqBody :: Type -> ContentType -> Spec

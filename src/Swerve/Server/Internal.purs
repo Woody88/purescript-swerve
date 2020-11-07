@@ -4,27 +4,35 @@ import Prelude
 
 import Data.Either (Either(..))
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap, wrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
+import Effect.Aff as Aff
+import Effect.Aff.Class (liftAff)
 import Effect.Class.Console as Console
+import Effect.Ref as Ref
+import Network.HTTP.Types (hContentType)
 import Network.Wai (Application, Request(..), responseStr)
 import Network.Wai as Wai
+import Node.Buffer as Buffer
+import Node.Encoding (Encoding(..))
+import Node.Stream as Stream
 import Prim.RowList (class RowToList)
 import Simple.JSON (class WriteForeign, writeJSON)
 import Swerve.API.Capture (class ReadCapture, readCapture)
+import Swerve.API.ContentType (class AllCTUnrender, class AllMimeUnrender, class MimeUnrender, canHandleCTypeH)
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus, getStatus)
-import Swerve.API.Types (type (:>), Capture, Header, QueryParam, Spec, Verb)
-import Swerve.Server.Internal.Delayed (Delayed, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction)
-import Swerve.Server.Internal.DelayedIO (delayedFail, withRequest)
+import Swerve.API.Types (type (:>), Capture, Header, QueryParam, ReqBody, Spec, Verb)
+import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction)
+import Swerve.Server.Internal.DelayedIO (delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.Response (class VariantResponse, Response(..), variantResponse)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), leafRouter, pathRouter, runRouter)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
-import Swerve.Server.Internal.ServerError (err400, err404)
+import Swerve.Server.Internal.ServerError (err400, err404, err415, err500)
 import Type.Equality (class TypeEquals)
 import Type.Equality as TypeEquals
 import Type.Proxy (Proxy(..))
@@ -37,6 +45,7 @@ type Server spec = Server' spec Aff
 class EvalServer server handler | server -> handler
 
 instance evalServerVerb :: EvalServer (Server' (Verb status a hdrs ctypes row) Aff) (Aff (Response row a))
+instance evalServerReqBody :: EvalServer (Server' (ReqBody a ctypes :> api) Aff) (a -> Server' api Aff)
 instance evalServerCapture  ::  EvalServer (Server' (Capture a :> api) Aff) (a -> Server' api Aff)
 instance evalServerQueryParam  ::  IsSymbol sym => EvalServer (Server' (QueryParam sym a :> api) Aff) (Maybe a -> Server' api Aff)
 instance evalServerHeader  ::  IsSymbol sym => EvalServer (Server' (Header sym a :> api) Aff) (a -> Server' api Aff)
@@ -58,6 +67,41 @@ instance hasServerVerb ::
         \(Response v) -> case v of 
             Right a -> Route $ responseStr (getStatus status) [] (writeJSON a)
             Left vr -> Route $ variantResponse (Proxy :: _ rl) vr
+
+instance hasServerReqBody :: 
+  ( AllCTUnrender ctypes a
+  , HasServer api context handler 
+  ) => HasServer (ReqBody a ctypes :> api) context (a -> handler) where 
+  route _ context subserver = route (Proxy :: Proxy api) context $ addBodyCheck (toHandler subserver) ctCheck bodyCheck
+    where 
+      ctCheck = withRequest $ \(Request req) -> do
+        let hdrs = Map.fromFoldable req.headers 
+            contentTypeH = fromMaybe "application/octet-stream" $ Map.lookup hContentType hdrs
+        case canHandleCTypeH (Proxy :: Proxy ctypes) contentTypeH :: Maybe (String -> Either String a) of
+          Nothing -> delayedFail err415
+          Just f  -> pure f
+
+      bodyCheck f = withRequest $ \request -> do
+        mrqbody <- f <$> liftAff (requestBody request)
+
+        case mrqbody of
+          Left e  -> delayedFailFatal $ err500 { content = e }
+          Right v -> pure v
+
+      requestBody (Request req) = Aff.makeAff \done -> do
+        case req.body of 
+          Nothing     -> done $ Right "" 
+          Just stream -> do 
+            bufs <- Ref.new []
+
+            Stream.onData stream \buf ->
+              void $ Ref.modify (_ <> [buf]) bufs
+
+            Stream.onEnd stream do
+              body <- Ref.read bufs >>= Buffer.concat >>= Buffer.toString UTF8
+              done $ Right body
+            
+        pure Aff.nonCanceler
 
 instance hasServerCapture :: 
   ( ReadCapture a
