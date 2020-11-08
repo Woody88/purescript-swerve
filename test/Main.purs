@@ -33,6 +33,8 @@ type Authorization = String
 
 type API = GetUser :<|> GetRaw 
 
+type API2 = "endpoints" :> API 
+
 type GetUser 
   = "users" 
   :> Capture UserId 
@@ -46,16 +48,16 @@ type GetRaw = "raw" :> Raw
 getUser :: UserId -> Maybe MaxAge -> Authorization -> String -> Aff (Response _ User) 
 getUser _ _ _ body = do 
   Console.log $ "Body: " <> body
-  pure $ respond "Woody"
+  pure $ respond "User1"
 
 getRaw :: Wai.Application
-getRaw req send = send $ Wai.responseStr ok200 [] "Woody, raw"
+getRaw req send = send $ Wai.responseStr ok200 [] "Raw!"
 
-server :: Server API 
+server :: Server API2 
 server = Server.from (getUser :<|> getRaw)
 
 app :: Wai.Application 
-app = serve (Proxy :: _ API) server
+app = serve (Proxy :: _ API2) server
 
 -- app' :: Wai.Application
 -- app' = toApplication $ runRouter (const err404) router
@@ -75,7 +77,7 @@ main = Aff.launchAff_ do
   stream <- liftEffect $ newStream "Hello, World!"
   app (request stream) responseFn
   where 
-    request s = wrap $ _ { body = Just s,  pathInfo = [ "raw" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
+    request s = wrap $ _ { body = Just s,  pathInfo = [ "endpoints", "raw" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
     responseFn (Wai.ResponseString status headers message) = liftEffect $ D.eval { status, headers, message }
     responseFn _ = liftEffect $ D.eval "bad response"
 
