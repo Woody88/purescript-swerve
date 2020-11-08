@@ -25,12 +25,12 @@ import Swerve.API.ContentType (class AllCTUnrender, class AllMimeUnrender, class
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus, getStatus)
-import Swerve.API.Types (type (:>), Capture, Header, QueryParam, Raw, ReqBody, Spec, Verb)
+import Swerve.API.Types (type (:<|>), type (:>), Alt'(..), Capture, Header, QueryParam, Raw, ReqBody, Spec, Verb, (:<|>))
 import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.Response (class VariantResponse, Response(..), variantResponse)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
-import Swerve.Server.Internal.Router (Router, Router'(..), leafRouter, pathRouter, runRouter)
+import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter, runRouter)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
 import Swerve.Server.Internal.ServerError (err400, err404, err415, err500)
 import Type.Equality (class TypeEquals)
@@ -44,6 +44,7 @@ type Server spec = Server' spec Aff
  
 class EvalServer server handler | server -> handler
 
+instance evalServerAlt        :: EvalServer (Server' (a :<|> b) Aff) (Alt' (Server' a Aff) (Server' b Aff))
 instance evalServerRaw        :: TypeEquals Application application => EvalServer (Server' Raw Aff) application
 instance evalServerVerb       :: EvalServer (Server' (Verb status a hdrs ctypes row) Aff) (Aff (Response row a))
 instance evalServerReqBody    :: EvalServer (Server' (ReqBody a ctypes :> api) Aff) (a -> Server' api Aff)
@@ -54,6 +55,16 @@ instance evalServerSeg        :: IsSymbol path => EvalServer (Server' (path :> a
 
 class HasServer api context handler | api -> context handler where 
   route :: forall env. Proxy api -> Record context -> Delayed env (Server api) -> Router env
+
+instance hasServerAlt :: 
+  ( HasServer a context handlera
+  , HasServer b context handlerb
+  ) => HasServer (a :<|> b) context (Alt' handlera handlerb) where 
+  route _ context server = choice (route pa context ((\ (a :<|> _) -> a) <$> (toHandler server)))
+                                  (route pb context ((\ (_ :<|> b) -> b) <$> (toHandler server)))
+    where
+      pa = Proxy :: _ a 
+      pb = Proxy :: _ b 
 
 instance hasServerRaw :: HasServer Raw context handler where 
   route _ _ rawApplication = RawRouter $ \env request respond -> do 
