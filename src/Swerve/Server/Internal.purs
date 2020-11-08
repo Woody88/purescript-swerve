@@ -13,7 +13,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console as Console
 import Effect.Ref as Ref
 import Network.HTTP.Types (hContentType)
-import Network.Wai (Application, Request(..), responseStr)
+import Network.Wai (Request(..), Application, responseStr)
 import Network.Wai as Wai
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
@@ -25,8 +25,8 @@ import Swerve.API.ContentType (class AllCTUnrender, class AllMimeUnrender, class
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus, getStatus)
-import Swerve.API.Types (type (:>), Capture, Header, QueryParam, ReqBody, Spec, Verb)
-import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction)
+import Swerve.API.Types (type (:>), Capture, Header, QueryParam, Raw, ReqBody, Spec, Verb)
+import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.Response (class VariantResponse, Response(..), variantResponse)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
@@ -44,22 +44,31 @@ type Server spec = Server' spec Aff
  
 class EvalServer server handler | server -> handler
 
-instance evalServerVerb :: EvalServer (Server' (Verb status a hdrs ctypes row) Aff) (Aff (Response row a))
-instance evalServerReqBody :: EvalServer (Server' (ReqBody a ctypes :> api) Aff) (a -> Server' api Aff)
-instance evalServerCapture  ::  EvalServer (Server' (Capture a :> api) Aff) (a -> Server' api Aff)
-instance evalServerQueryParam  ::  IsSymbol sym => EvalServer (Server' (QueryParam sym a :> api) Aff) (Maybe a -> Server' api Aff)
-instance evalServerHeader  ::  IsSymbol sym => EvalServer (Server' (Header sym a :> api) Aff) (a -> Server' api Aff)
-instance evalServerSeg  :: IsSymbol path => EvalServer (Server' (path :> api) Aff) (Server' api Aff)
+instance evalServerRaw        :: TypeEquals Application application => EvalServer (Server' Raw Aff) application
+instance evalServerVerb       :: EvalServer (Server' (Verb status a hdrs ctypes row) Aff) (Aff (Response row a))
+instance evalServerReqBody    :: EvalServer (Server' (ReqBody a ctypes :> api) Aff) (a -> Server' api Aff)
+instance evalServerCapture    :: EvalServer (Server' (Capture a :> api) Aff) (a -> Server' api Aff)
+instance evalServerQueryParam :: IsSymbol sym => EvalServer (Server' (QueryParam sym a :> api) Aff) (Maybe a -> Server' api Aff)
+instance evalServerHeader     :: IsSymbol sym => EvalServer (Server' (Header sym a :> api) Aff) (a -> Server' api Aff)
+instance evalServerSeg        :: IsSymbol path => EvalServer (Server' (path :> api) Aff) (Server' api Aff)
 
 class HasServer api context handler | api -> context handler where 
   route :: forall env. Proxy api -> Record context -> Delayed env (Server api) -> Router env
+
+instance hasServerRaw :: HasServer Raw context handler where 
+  route _ _ rawApplication = RawRouter $ \env request respond -> do 
+    r <- runDelayed (toHandler rawApplication) env request
+    case r of 
+      Route app   -> app request (respond <<< Route)
+      Fail a      -> respond $ Fail a 
+      FailFatal e -> respond $ FailFatal e
 
 instance hasServerVerb :: 
   ( RowToList row rl
   , HasStatus status label 
   , WriteForeign a 
   , VariantResponse row rl 
-  ) => HasServer (Verb status a hdrs ctypes row) context (Aff (Response row a)) where 
+  ) => HasServer (Verb status a hdrs ctypes row) context handler where 
   route _ _ subserver = leafRouter route'
     where 
       status = Proxy :: _ status 

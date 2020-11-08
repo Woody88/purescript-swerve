@@ -11,12 +11,11 @@ import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
-import Network.HTTP.Types (hAuthorization, hContentType)
-import Network.Wai (Application, Response(..), defaultRequest) as Wai
-import Network.Wai (responseStr)
+import Network.HTTP.Types (hAuthorization, hContentType, ok200)
+import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
 import Node.Stream (Readable)
 import Swerve.API.ContentType (JSON, PlainText)
-import Swerve.API.Types (type (:>), Capture, Header, QueryParam, ReqBody)
+import Swerve.API.Types (type (:>), Capture, Header, QueryParam, Raw, ReqBody)
 import Swerve.API.Verb (Get)
 import Swerve.Server.Internal (Server, serve)
 import Swerve.Server.Internal (from) as Server
@@ -32,18 +31,23 @@ type UserId = Int
 type MaxAge = Int 
 type Authorization = String 
 
-type GetUser 
-  = "users" 
-  :> Capture UserId 
-  :> QueryParam "maxAge" MaxAge 
-  :> Header "authorization" Authorization 
-  :> ReqBody String PlainText
-  :> Get User JSON 
+-- type GetUser 
+--   = "users" 
+--   :> Capture UserId 
+--   :> QueryParam "maxAge" MaxAge 
+--   :> Header "authorization" Authorization 
+--   :> ReqBody String PlainText
+--   :> Get User JSON 
 
-getUser :: UserId -> Maybe MaxAge -> Authorization -> String -> Aff (Response _ User) 
-getUser _ _ _ body = do 
-  Console.log $ "Body: " <> body
-  pure $ respond "Woody"
+type GetUser = "users" :> Raw 
+
+-- getUser :: UserId -> Maybe MaxAge -> Authorization -> String -> Aff (Response _ User) 
+-- getUser _ _ _ body = do 
+--   Console.log $ "Body: " <> body
+--   pure $ respond "Woody"
+
+getUser :: Wai.Application
+getUser req send = send $ Wai.responseStr ok200 [] "Woody, raw"
 
 server :: Server GetUser 
 server = Server.from getUser
@@ -69,7 +73,7 @@ main = Aff.launchAff_ do
   stream <- liftEffect $ newStream "Hello, World!"
   app (request stream) responseFn
   where 
-    request s = wrap $ _ { body = Just s,  pathInfo = [ "users", "13" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
+    request s = wrap $ _ { body = Just s,  pathInfo = [ "users", "yo"  ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
     responseFn (Wai.ResponseString status headers message) = liftEffect $ D.eval { status, headers, message }
     responseFn _ = liftEffect $ D.eval "bad response"
 
