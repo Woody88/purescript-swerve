@@ -33,8 +33,6 @@ type Authorization = String
 
 type API = GetUser :<|> GetRaw 
 
-type API2 = "endpoints" :> API 
-
 type GetUser 
   = "users" 
   :> Capture UserId 
@@ -53,11 +51,11 @@ getUser _ _ _ body = do
 getRaw :: Wai.Application
 getRaw req send = send $ Wai.responseStr ok200 [] "Raw!"
 
-server :: Server API2 
+server :: Server API
 server = Server.from (getUser :<|> getRaw)
 
 app :: Wai.Application 
-app = serve (Proxy :: _ API2) server
+app = serve (Proxy :: _ API) server
 
 -- app' :: Wai.Application
 -- app' = toApplication $ runRouter (const err404) router
