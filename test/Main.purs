@@ -57,6 +57,16 @@ server = Server.from (getUser :<|> getRaw)
 app :: Wai.Application 
 app = serve (Proxy :: _ API) server
 
+main :: Effect Unit
+main = Aff.launchAff_ do 
+  stream <- liftEffect $ newStream "Hello, World!"
+  app (request stream) responseFn
+  where 
+    request s = wrap $ _ { body = Just s,  pathInfo = [ "users", "13" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
+    responseFn (Wai.ResponseString status headers message) = liftEffect $ D.eval { status, headers, message }
+    responseFn _ = liftEffect $ D.eval "bad response"
+
+foreign import newStream :: String -> Effect (Readable ())
 -- app' :: Wai.Application
 -- app' = toApplication $ runRouter (const err404) router
 
@@ -70,13 +80,3 @@ app = serve (Proxy :: _ API) server
 -- router :: Router Unit 
 -- router = pathRouter "users" $ pathRouter "view" $ leafRouter $ \_ _ cont -> cont (Route $ responseStr ({code: 201, message: ""}) [] "")
 
-main :: Effect Unit
-main = Aff.launchAff_ do 
-  stream <- liftEffect $ newStream "Hello, World!"
-  app (request stream) responseFn
-  where 
-    request s = wrap $ _ { body = Just s,  pathInfo = [ "endpoints", "raw" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
-    responseFn (Wai.ResponseString status headers message) = liftEffect $ D.eval { status, headers, message }
-    responseFn _ = liftEffect $ D.eval "bad response"
-
-foreign import newStream :: String -> Effect (Readable ())
