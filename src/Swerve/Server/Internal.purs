@@ -18,6 +18,7 @@ import Network.Wai as Wai
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
+import Prim.Row as Row
 import Prim.RowList (class RowToList)
 import Simple.JSON (class WriteForeign, writeJSON)
 import Swerve.API.Capture (class ReadCapture, readCapture)
@@ -25,10 +26,10 @@ import Swerve.API.ContentType (class AllCTUnrender, class AllMimeUnrender, class
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus, getStatus)
-import Swerve.API.Types (type (:<|>), type (:>), Alt'(..), Capture, Header, QueryParam, Raw, ReqBody, Spec, Verb, (:<|>))
+import Swerve.API.Types (type (:<|>), type (:>), Alt'(..), Capture, Header, QueryParam, Raw, ReqBody, Respond, Spec, Verb, (:<|>))
 import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (delayedFail, delayedFailFatal, withRequest)
-import Swerve.Server.Internal.Response (class VariantResponse, Response(..), variantResponse)
+import Swerve.Server.Internal.Response (Response(..))
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter, runRouter)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
@@ -46,7 +47,7 @@ class EvalServer server handler | server -> handler
 
 instance evalServerAlt        :: EvalServer (Server' (a :<|> b) Aff) (Alt' (Server' a Aff) (Server' b Aff))
 instance evalServerRaw        :: TypeEquals Application application => EvalServer (Server' Raw Aff) application
-instance evalServerVerb       :: EvalServer (Server' (Verb status a hdrs ctypes row) Aff) (Aff (Response row a))
+instance evalServerVerb       :: EvalServer (Server' (Verb mtd a respond) Aff) (Aff (Response row a))
 instance evalServerReqBody    :: EvalServer (Server' (ReqBody a ctypes :> api) Aff) (a -> Server' api Aff)
 instance evalServerCapture    :: EvalServer (Server' (Capture a :> api) Aff) (a -> Server' api Aff)
 instance evalServerQueryParam :: IsSymbol sym => EvalServer (Server' (QueryParam sym a :> api) Aff) (Maybe a -> Server' api Aff)
@@ -75,18 +76,16 @@ instance hasServerRaw :: HasServer Raw context handler where
       FailFatal e -> respond $ FailFatal e
 
 instance hasServerVerb :: 
-  ( RowToList row rl
-  , HasStatus status label 
-  , WriteForeign a 
-  , VariantResponse row rl 
-  ) => HasServer (Verb status a hdrs ctypes row) context handler where 
+  ( Row.Cons label (Respond status hdrs ctypes) r row
+  , HasStatus status label
+  ) => HasServer (Verb method a (Respond status hdrs ctypes)) context (Aff (Response row a)) where 
   route _ _ subserver = leafRouter route'
     where 
       status = Proxy :: _ status 
       route' env request respond = runAction (toHandler subserver) env request respond 
         \(Response v) -> case v of 
-            Right a -> Route $ responseStr (getStatus status) [] (writeJSON a)
-            Left vr -> Route $ variantResponse (Proxy :: _ rl) vr
+            Right s -> Route $ responseStr s.status [] s.content
+            Left f  -> Route $ responseStr f.status [] f.content
 
 instance hasServerReqBody :: 
   ( AllCTUnrender ctypes a
