@@ -5,7 +5,7 @@ import Swerve.API.Types (Method, Verb)
 
 foreign import data GET :: Method
 
-type Get a respond = Verb GET a respond
+type Get a status hdrs ctypes = Verb GET a status hdrs ctypes 
 -- type Get' a ctypes hdrs resp = Verb Ok a hdrs ctypes resp
 
 -- type Post a ctypes = Verb Ok a () ctypes () 

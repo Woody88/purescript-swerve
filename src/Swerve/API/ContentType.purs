@@ -23,6 +23,7 @@ import Swerve.API.Types (ContentType)
 import Swerve.API.Types (type (:<|>))
 import Type.Proxy (Proxy(..))
 
+foreign import data Star :: ContentType
 foreign import data JSON :: ContentType
 foreign import data PlainText :: ContentType
 foreign import data FormUrlEncoded :: ContentType

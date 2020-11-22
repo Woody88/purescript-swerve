@@ -26,7 +26,7 @@ import Swerve.API.ContentType (class AllCTUnrender, class AllMimeUnrender, class
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus, getStatus)
-import Swerve.API.Types (type (:<|>), type (:>), Alt'(..), Capture, Header, QueryParam, Raw, ReqBody, Respond, Spec, Verb, (:<|>))
+import Swerve.API.Types (type (:<|>), type (:>), Alt'(..), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond, Respond', Spec, Verb, (:<|>))
 import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.Response (Response(..))
@@ -47,7 +47,8 @@ class EvalServer server handler | server -> handler
 
 instance evalServerAlt        :: EvalServer (Server' (a :<|> b) Aff) (Alt' (Server' a Aff) (Server' b Aff))
 instance evalServerRaw        :: TypeEquals Application application => EvalServer (Server' Raw Aff) application
-instance evalServerVerb       :: EvalServer (Server' (Verb mtd a respond) Aff) (Aff (Response row a))
+instance evalServerRaise      :: EvalServer (Server' ((Raise status6 hdrs7 ctypes8) :> api) Aff) (Server' api Aff)
+instance evalServerVerb       :: EvalServer (Server' (Verb method a status hdrs ctypes) Aff) (Aff (Response rs a))
 instance evalServerReqBody    :: EvalServer (Server' (ReqBody a ctypes :> api) Aff) (a -> Server' api Aff)
 instance evalServerCapture    :: EvalServer (Server' (Capture a :> api) Aff) (a -> Server' api Aff)
 instance evalServerQueryParam :: IsSymbol sym => EvalServer (Server' (QueryParam sym a :> api) Aff) (Maybe a -> Server' api Aff)
@@ -76,9 +77,8 @@ instance hasServerRaw :: HasServer Raw context handler where
       FailFatal e -> respond $ FailFatal e
 
 instance hasServerVerb :: 
-  ( Row.Cons label (Respond status hdrs ctypes) r row
-  , HasStatus status label
-  ) => HasServer (Verb method a (Respond status hdrs ctypes)) context (Aff (Response row a)) where 
+  ( HasStatus status
+  ) => HasServer (Verb method a status hdrs ctypes) context (Aff (Response (Either (Respond' status hdrs) l) a)) where 
   route _ _ subserver = leafRouter route'
     where 
       status = Proxy :: _ status 
@@ -86,6 +86,13 @@ instance hasServerVerb ::
         \(Response v) -> case v of 
             Right s -> Route $ responseStr s.status [] s.content
             Left f  -> Route $ responseStr f.status [] f.content
+
+instance hasServerRaise :: 
+  ( HasStatus status
+  , HasServer api context (Aff (Response handler a)) 
+  ) => HasServer ((Raise status hdrs ctypes) :> api) context (Aff (Response (Either (Respond' status hdrs) handler) a)) where 
+  route _ ctx subserver = route (Proxy :: _ api) ctx (toHandler subserver) 
+
 
 instance hasServerReqBody :: 
   ( AllCTUnrender ctypes a

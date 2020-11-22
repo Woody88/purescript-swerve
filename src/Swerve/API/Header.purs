@@ -14,3 +14,5 @@ instance readHeaderInt :: ReadHeader Int where
 
 instance readHeaderMaybe :: ReadHeader a => ReadHeader (Maybe a) where 
   readHeader = readHeader 
+
+class WithHeader (hdrs :: Row Type)
