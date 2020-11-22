@@ -55,15 +55,12 @@ getUser :: forall rs
   -> Maybe MaxAge 
   -> Authorization 
   -> String -> Aff (Response rs User) 
-getUser userId _ _ body = -- do
-  -- Console.log $ "Body: " <> body
-  -- pure $ respond _Ok "User1"
-  case userId of 
-    13        -> pure $ raise _BadRequest
-    17        -> pure $ raise _NotFound
-    otherwise -> do
-      Console.log $ "Body: " <> body
-      pure $ respond _Ok "User1"
+getUser userId _ _ body = case userId of 
+  13        -> pure $ raise _BadRequest
+  17        -> pure $ raise _NotFound
+  otherwise -> do
+    Console.log $ "Body: " <> body
+    pure $ respond _Ok "User1"
 
 -- getRaw :: Wai.Application
 -- getRaw req send = send $ Wai.responseStr ok200 [] "Raw!"
