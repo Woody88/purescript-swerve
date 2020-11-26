@@ -13,6 +13,10 @@ type OtherResponse = Row Type
 
 data Alt' a b = Alt' a b 
 
+data Sub' :: forall k. k -> Type -> Type 
+data Sub' a b
+infixr 4 type Sub' as <:>  
+
 foreign import data Sub :: forall k. k -> Spec -> Spec 
 foreign import data Alt :: Spec -> Spec -> Spec 
 
@@ -30,4 +34,4 @@ foreign import data Verb  :: Method -> Type -> Status -> Headers -> ContentType 
 foreign import data Respond  :: Status -> Headers -> ContentType -> Spec
 foreign import data Raise  :: Status -> Headers -> ContentType -> Spec
 foreign import data ReqBody :: Type -> ContentType -> Spec
-foreign import data Raw     :: Spec 
+foreign import data Raw     :: Spec

@@ -7,9 +7,7 @@ import Data.Function (applyFlipped)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested (type (/\), (/\))
 import Effect.Aff (Aff)
-import Effect.Aff.Class (liftAff)
-import Effect.Class.Console as Console
-import Network.Wai (Request(..), Response)
+import Network.Wai (Request, Response)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, liftRouteResult, runDelayedIO)
 import Swerve.Server.Internal.Response (Response) as Resp
 import Swerve.Server.Internal.RouteResult (RouteResult(..))

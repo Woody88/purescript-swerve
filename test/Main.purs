@@ -17,9 +17,9 @@ import Network.Wai (Application, Response(..), defaultRequest, responseStr) as W
 import Node.Stream (Readable)
 import Swerve.API.ContentType (JSON, PlainText)
 import Swerve.API.Status (BadRequest, NotFound, Ok, _BadRequest, _NotFound, _Ok)
-import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond, Respond', (:<|>))
+import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond, Respond', Spec, (:<|>))
 import Swerve.API.Verb (Get)
-import Swerve.Server.Internal (Server, serve)
+import Swerve.Server.Internal (class HasServer, Server, route, serve, toHandler)
 import Swerve.Server.Internal (from) as Server
 import Swerve.Server.Internal.Response (class HasResp, Response(..), raise, respond)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
@@ -33,7 +33,7 @@ type UserId = Int
 type MaxAge = Int 
 type Authorization = String 
 
-type API = GetUser -- :<|> GetRaw 
+type API = GetUser :<|> GetRaw 
 
 type GetUser 
   = "users" 
@@ -41,11 +41,11 @@ type GetUser
   :> QueryParam "maxAge" MaxAge 
   :> Header "authorization" Authorization 
   :> ReqBody String PlainText
-  :> Raise BadRequest () JSON 
-  :> Raise NotFound () JSON 
+  :> Raise BadRequest () JSON
+  :> Raise NotFound () JSON
   :> Get User Ok () JSON 
 
--- type GetRaw = "raw" :> Raw 
+type GetRaw = "raw" :> Raw 
 
 getUser :: forall rs
   .  HasResp Ok () rs
@@ -62,12 +62,11 @@ getUser userId _ _ body = case userId of
     Console.log $ "Body: " <> body
     pure $ respond _Ok "User1"
 
--- getRaw :: Wai.Application
--- getRaw req send = send $ Wai.responseStr ok200 [] "Raw!"
+getRaw :: Wai.Application
+getRaw req send = send $ Wai.responseStr ok200 [] "Raw!"
 
 server :: Server API
-server = Server.from getUser
--- server = Server.from (getUser :<|> getRaw)
+server = Server.from (getUser :<|> getRaw)
 
 app :: Wai.Application 
 app = serve (Proxy :: _ API) server

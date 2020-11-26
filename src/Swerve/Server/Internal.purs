@@ -5,28 +5,23 @@ import Prelude
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (unwrap, wrap)
+import Data.Newtype (wrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console as Console
 import Effect.Ref as Ref
 import Network.HTTP.Types (hContentType)
 import Network.Wai (Request(..), Application, responseStr)
-import Network.Wai as Wai
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
-import Prim.Row as Row
-import Prim.RowList (class RowToList)
-import Simple.JSON (class WriteForeign, writeJSON)
 import Swerve.API.Capture (class ReadCapture, readCapture)
-import Swerve.API.ContentType (class AllCTUnrender, class AllMimeUnrender, class MimeUnrender, canHandleCTypeH)
+import Swerve.API.ContentType (class AllCTUnrender, canHandleCTypeH)
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
-import Swerve.API.Status (class HasStatus, getStatus)
-import Swerve.API.Types (type (:<|>), type (:>), Alt'(..), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond, Respond', Spec, Verb, (:<|>))
+import Swerve.API.Status (class HasStatus)
+import Swerve.API.Types (type (:<|>), type (:>), Alt', Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', Spec, Verb, (:<|>))
 import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.Response (Response(..))
@@ -35,14 +30,14 @@ import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, p
 import Swerve.Server.Internal.RoutingApplication (toApplication)
 import Swerve.Server.Internal.ServerError (err400, err404, err415, err500)
 import Type.Equality (class TypeEquals)
-import Type.Equality as TypeEquals
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
-data Server' ( spec :: Spec) (m :: Type -> Type)
+foreign import data Server' :: Spec -> (Type -> Type) -> Type 
 
 type Server spec = Server' spec Aff
  
+class EvalServer :: forall k1 k2. k1 -> k2 -> Constraint
 class EvalServer server handler | server -> handler
 
 instance evalServerAlt        :: EvalServer (Server' (a :<|> b) Aff) (Alt' (Server' a Aff) (Server' b Aff))
@@ -55,6 +50,7 @@ instance evalServerQueryParam :: IsSymbol sym => EvalServer (Server' (QueryParam
 instance evalServerHeader     :: IsSymbol sym => EvalServer (Server' (Header sym a :> api) Aff) (a -> Server' api Aff)
 instance evalServerSeg        :: IsSymbol path => EvalServer (Server' (path :> api) Aff) (Server' api Aff)
 
+class HasServer :: forall k. Spec -> Row Type -> k -> Constraint
 class HasServer api context handler | api -> context handler where 
   route :: forall env. Proxy api -> Record context -> Delayed env (Server api) -> Router env
 
@@ -92,7 +88,6 @@ instance hasServerRaise ::
   , HasServer api context (Aff (Response handler a)) 
   ) => HasServer ((Raise status hdrs ctypes) :> api) context (Aff (Response (Either (Respond' status hdrs) handler) a)) where 
   route _ ctx subserver = route (Proxy :: _ api) ctx (toHandler subserver) 
-
 
 instance hasServerReqBody :: 
   ( AllCTUnrender ctypes a
