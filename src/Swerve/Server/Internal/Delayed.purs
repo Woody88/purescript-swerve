@@ -95,6 +95,24 @@ addHeaderCheck delayed new =
                     , server  = \ c p (Tuple h hNew) a b req -> (applyFlipped hNew) <$> server c p h a b req
                     }
 
+addMethodCheck :: forall env a. 
+  Delayed env a
+  -> DelayedIO Unit
+  -> Delayed env a
+addMethodCheck delayed new =
+  delayed 
+    # unDelayed \d@{ method } -> 
+        mkDelayed d { method = method <* new } 
+
+addAcceptCheck :: forall env a. 
+  Delayed env a
+  -> DelayedIO Unit
+  -> Delayed env a
+addAcceptCheck delayed new =
+  delayed 
+    # unDelayed \d@{ accept } -> 
+        mkDelayed d { accept = accept <* new } 
+
 addAuthCheck :: forall env a b. 
   Delayed env (a -> b)
   -> DelayedIO a

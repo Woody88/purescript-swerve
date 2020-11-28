@@ -11,24 +11,26 @@ import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Aff.Class (liftAff)
 import Effect.Ref as Ref
-import Network.HTTP.Types (hContentType)
+import Network.HTTP.Types (Method, hAccept, hContentType)
+import Network.HTTP.Types.Method (methodGet, methodHead)
 import Network.Wai (Request(..), Application, responseStr)
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
 import Swerve.API.Capture (class ReadCapture, readCapture)
-import Swerve.API.ContentType (class AllCTUnrender, canHandleCTypeH)
+import Swerve.API.ContentType (class AllCTUnrender, class AllMime, AcceptHeader(..), canHandleAcceptH, canHandleCTypeH)
 import Swerve.API.Header (class ReadHeader, readHeader)
+import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus)
 import Swerve.API.Types (type (:<|>), type (:>), Alt', Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', Spec, Verb, (:<|>))
-import Swerve.Server.Internal.Delayed (Delayed, addBodyCheck, addCapture, addHeaderCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
-import Swerve.Server.Internal.DelayedIO (delayedFail, delayedFailFatal, withRequest)
+import Swerve.Server.Internal.Delayed (Delayed, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
+import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.Response (Response(..))
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter, runRouter)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
-import Swerve.Server.Internal.ServerError (err400, err404, err415, err500)
+import Swerve.Server.Internal.ServerError (err400, err404, err405, err406, err415, err500)
 import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -74,14 +76,23 @@ instance hasServerRaw :: HasServer Raw context handler where
 
 instance hasServerVerb :: 
   ( HasStatus status
+  , ToMethod method
+  , AllMime ctypes 
   ) => HasServer (Verb method a status hdrs ctypes) context (Aff (Response (Either (Respond' status hdrs) l) a)) where 
   route _ _ subserver = leafRouter route'
     where 
       status = Proxy :: _ status 
-      route' env request respond = runAction (toHandler subserver) env request respond 
-        \(Response v) -> case v of 
-            Right s -> Route $ responseStr s.status [] s.content
-            Left f  -> Route $ responseStr f.status [] f.content
+      method = toMethod (Proxy :: _ method)
+      ctypesP = Proxy :: _ ctypes 
+      route' env request respond = do 
+        let 
+          accH   = getAcceptHeader request
+          action = toHandler subserver `addMethodCheck` methodCheck method request
+                                       `addAcceptCheck` acceptCheck ctypesP accH
+        runAction action env request respond 
+          \(Response v) -> case v of 
+              Right s -> Route $ responseStr s.status [] s.content
+              Left f  -> Route $ responseStr f.status [] f.content
 
 instance hasServerRaise :: 
   ( HasStatus status
@@ -173,6 +184,30 @@ instance hasServerSegment ::
   route _ ctx subserver = pathRouter path (route (Proxy :: _ api) ctx (toHandler subserver))
     where 
       path = reflectSymbol (SProxy :: _ path)
+
+allowedMethodHead :: Method -> Request -> Boolean
+allowedMethodHead method (Request req) = method == methodGet && (show req.method) == methodHead
+
+allowedMethod :: Method -> Request -> Boolean
+allowedMethod method request@(Request req) = allowedMethodHead method request || (show req.method) == method
+
+methodCheck :: Method -> Request -> DelayedIO Unit
+methodCheck method request
+  | allowedMethod method request = pure unit 
+  | otherwise                    = delayedFail err405
+
+acceptCheck :: forall list. AllMime list => Proxy list -> AcceptHeader -> DelayedIO Unit
+acceptCheck proxy accH
+  | canHandleAcceptH proxy accH = pure unit
+  | otherwise                   = delayedFail err406
+
+ctWildcard :: String
+ctWildcard = "*" <> "/" <> "*" 
+
+getAcceptHeader :: Request -> AcceptHeader
+getAcceptHeader (Request req) = AcceptHeader <<< fromMaybe ctWildcard <<< Map.lookup hAccept $ requestHeaders
+  where
+    requestHeaders = Map.fromFoldable req.headers 
 
 from :: forall handlers api context. HasServer api context handlers => handlers -> Server api
 from = unsafeCoerce

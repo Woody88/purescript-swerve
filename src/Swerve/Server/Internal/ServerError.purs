@@ -12,16 +12,28 @@ type ServerError
 responseServerError :: ServerError -> Response
 responseServerError se = responseStr se.status se.headers se.content
 
+err400 :: ServerError
+err400 = { content: ""
+         , headers: []
+         , status: H.badRequest400
+         }
+
 err404 :: ServerError
 err404 = { content: ""
          , headers: []
          , status: H.notFound404
          }
 
-err400 :: ServerError
-err400 = { content: ""
+err405 :: ServerError
+err405 = { content: ""
          , headers: []
-         , status: H.badRequest400
+         , status: H.methodNotAllowed405
+         }
+
+err406 :: ServerError
+err406 = { content: ""
+         , headers: []
+         , status: H.notAcceptable406
          }
 
 err415 :: ServerError
