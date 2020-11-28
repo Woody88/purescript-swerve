@@ -1,6 +1,5 @@
 module Swerve.API.Verb where
 
-import Swerve.API.Status (Ok)
 import Swerve.API.Types (Method, Verb)
 
 foreign import data GET :: Method

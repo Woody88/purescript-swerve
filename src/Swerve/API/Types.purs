@@ -1,7 +1,5 @@
 module Swerve.API.Types where 
 
-import Network.HTTP.Types as H
-
 data Spec
 data Status
 data ContentType 

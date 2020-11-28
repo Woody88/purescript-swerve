@@ -16,7 +16,6 @@ import Unsafe.Coerce (unsafeCoerce)
 data Delayed :: forall k. k -> Type -> Type
 data Delayed env c 
 
-
 type DelayedSpec env captures auth contentType params headers body c 
   = { captures :: env -> DelayedIO captures
     , method :: DelayedIO Unit

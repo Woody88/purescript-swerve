@@ -19,8 +19,7 @@ import Network.HTTP.Media as Media
 import Prim.TypeError as TE
 import Simple.JSON (class WriteForeign)
 import Simple.JSON as Json
-import Swerve.API.Types (ContentType)
-import Swerve.API.Types (type (:<|>))
+import Swerve.API.Types (type (:<|>), ContentType)
 import Type.Proxy (Proxy(..))
 
 foreign import data Star :: ContentType
@@ -34,9 +33,9 @@ newtype AcceptHeader = AcceptHeader String
 
 derive instance eqAcceptHeader :: Eq AcceptHeader
 
+class Accepts :: forall k. k -> Constraint
 class Accepts ctype where 
   contentTypes  :: Proxy ctype -> NonEmptyArray MediaType
-
   contentType :: Proxy ctype -> MediaType
 
 
@@ -55,6 +54,7 @@ instance acceptFormUrlEncoded :: Accepts FormUrlEncoded where
 
     contentTypes p = NE.singleton $ contentType p
 
+class AllCTRender :: forall k. k -> Type -> Constraint
 class AllMime ctypes <= AllCTRender ctypes a where
     handleAcceptH :: Proxy ctypes -> AcceptHeader -> a -> Maybe (Tuple String String)
 
@@ -73,6 +73,7 @@ else instance allCTRender' ::
             amrs = allMimeRender pctyps val
             lkup = map (\(Tuple a b) -> Tuple a (Tuple (Media.renderHeader a) b)) amrs
 
+class MimeRender :: forall k. k -> Type -> Constraint
 class Accepts ctype <= MimeRender ctype a where
     mimeRender  :: Proxy ctype -> a -> String 
 
@@ -88,6 +89,7 @@ instance mimeRenderPlainTextRecord :: WriteForeign (Record r) => MimeRender Plai
 instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncoded where 
     mimeRender _ = fromMaybe mempty <<< FormURLEncoded.encode
 
+class AllMime :: forall k. k -> Constraint
 class AllMime ctypes where 
     allMime :: Proxy ctypes -> Array MediaType 
 
@@ -100,6 +102,7 @@ instance allMimeAlt :: (AllMime ctypes, Accepts ctype, Accepts ctypes)  => AllMi
 else instance allMimeBase :: Accepts ctype => AllMime ctype where 
     allMime ctype = [contentType ctype]
 
+class AllMimeRender :: forall k. k -> Type -> Constraint
 class AllMimeRender ctype a where
     allMimeRender :: Proxy ctype -> a -> Array (Tuple MediaType String)
 
@@ -118,7 +121,7 @@ else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accepts ctype, MimeRe
 else instance allMimeRender' :: (Accepts ctype, MimeRender ctype a) => AllMimeRender ctype a where  --- base case  type class 
     allMimeRender pxy x = [ Tuple (contentType pxy) (mimeRender pxy x) ]
 
-
+class MimeUnrender :: forall k. k -> Type -> Constraint
 class Accepts ctype <= MimeUnrender ctype a where
     mimeUnrender :: Proxy ctype -> String -> Either String a    
 
@@ -131,6 +134,7 @@ instance mimeUnrenderJson :: Json.ReadForeign a => MimeUnrender JSON a where
 instance mimeUnrenderPlainText ::  MimeUnrender PlainText String where 
     mimeUnrender _ x = Right x
 
+class AllMimeUnrender :: forall k. k -> Type -> Constraint
 class (AllMime list) <= AllMimeUnrender list a where
   allMimeUnrender :: Proxy list -> Array (Tuple M.MediaType (String -> Either String a))
 
@@ -155,6 +159,7 @@ else instance allMimeUnrender' ::
       mk ct   = Tuple ct (mimeUnrenderWithType pctyp ct)
       pctyp  = Proxy :: Proxy ctyp
 
+class AllCTUnrender :: forall k. k -> Type -> Constraint
 class AllCTUnrender list a where
   canHandleCTypeH
     :: Proxy list

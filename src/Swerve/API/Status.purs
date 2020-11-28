@@ -1,7 +1,7 @@
 module Swerve.API.Status where
 
 import Network.HTTP.Types as H
-import Swerve.API.Types (Respond, Status)
+import Swerve.API.Types (Status)
 import Type.Proxy (Proxy(..))
 
 
@@ -15,9 +15,6 @@ _NotFound = Proxy :: _ NotFound
 foreign import data Ok :: Status
 foreign import data BadRequest :: Status
 foreign import data NotFound :: Status
-
--- data BadRequest hdrs ctype = BadRequest
--- data NotFound hdrs ctype = NotFound
 
 class HasStatus :: forall k. k -> Constraint
 class HasStatus a where 
