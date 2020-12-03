@@ -1,4 +1,4 @@
-module Test.Main where
+module Test.CustomMonad where
 
 import Prelude
 import Control.Monad.Reader.Class (ask)
@@ -16,65 +16,53 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Network.HTTP.Types (hAuthorization, hContentType, ok200)
 import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
+import Node.Stream (Readable)
 import Swerve.Tagged (Tagged(..))
 import Swerve.API.ContentType (JSON, PlainText)
 import Swerve.API.Status (BadRequest, NotFound, Ok, _BadRequest, _NotFound, _Ok)
 import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond, Respond', Spec, (:<|>))
 import Swerve.API.Verb (Get)
-import Swerve.Server.Internal (class HasServer, Server, Server', route, serve, toHandler)
+import Swerve.Server.Internal (class HasServer, Server, Server', route, serve, hoistServer, toHandler)
 import Swerve.Server.Internal (from) as Server
 import Swerve.Server.Internal.Response (class HasResp, Response(..), raise, respond)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, leafRouter, pathRouter, runRouter, tweakResponse)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
 import Swerve.Server.Internal.ServerError (err404)
-import Test.Stream
+import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 
-type User = String
-type UserId = Int  
-type MaxAge = Int 
-type Authorization = String 
+type ReaderAPI = GetRaw 
 
-type API = GetUser :<|> GetRaw 
+type GetRaw = "raw" :> Raw
+type Test = "test" :> Get String Ok () JSON  
 
-type GetUser 
-  = "users" 
-  :> Capture UserId 
-  :> QueryParam "maxAge" MaxAge 
-  :> Header "authorization" Authorization 
-  :> ReqBody String PlainText
-  :> Raise BadRequest () JSON
-  :> Raise NotFound () JSON
-  :> Get User Ok () JSON 
+readerApi = Proxy :: Proxy ReaderAPI
 
-type GetRaw = "raw" :> Raw 
-
-getUser :: forall rs
+getInt :: forall rs
   .  HasResp Ok () rs
-  => HasResp BadRequest () rs
-  => HasResp NotFound () rs
-  => UserId 
-  -> Maybe MaxAge 
-  -> Authorization 
-  -> String 
-  -> Aff (Response rs User) 
-getUser userId _ _ body = case userId of 
-  13        -> pure $ raise _BadRequest
-  17        -> pure $ raise _NotFound
-  otherwise -> do
-    Console.log $ "Body: " <> body
-    pure $ respond _Ok "User1"
+  => Reader String (Response rs String)
+getInt = do 
+  v <- ask 
+  pure $ respond _Ok v
 
-getRaw :: Aff Wai.Application
-getRaw = pure $ \req send -> send $ Wai.responseStr ok200 [] "Raw!"
+getRaw :: Reader String Wai.Application
+getRaw = do 
+  v <- ask
+  pure \req send -> send $ Wai.responseStr ok200 [] v
 
-server :: Server API
-server = Server.from (getUser :<|> getRaw)
 
+readerServer :: Server' ReaderAPI (Reader String)
+readerServer = Server.from (getRaw) 
+
+nt :: Reader String ~> Aff 
+nt = (pure <<< (flip runReader "hi"))
+
+server :: Server ReaderAPI
+server = hoistServer readerApi nt readerServer 
 
 app :: Wai.Application
-app = serve (Proxy :: _ API) server
+app = serve (Proxy :: _ ReaderAPI) server
 
 main :: Effect Unit
 main = Aff.launchAff_ do 
@@ -85,18 +73,3 @@ main = Aff.launchAff_ do
     responseFn (Wai.ResponseString status headers message) = do 
       liftEffect $ D.eval { status, headers, message }
     responseFn _ = liftEffect $ D.eval "bad response"
-
-
--- -- app' :: Wai.Application
--- -- app' = toApplication $ runRouter (const err404) router
-
--- -- router' :: Router Unit 
--- -- router' = tweakResponse (map twk) router
-
--- -- twk :: Wai.Response -> Wai.Response
--- -- twk (Wai.ResponseString s hs b) = Wai.ResponseString (s { code = (s.code + 1) }) hs b
--- -- twk b = b
-
--- -- router :: Router Unit 
--- -- router = pathRouter "users" $ pathRouter "view" $ leafRouter $ \_
-

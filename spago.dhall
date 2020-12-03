@@ -13,6 +13,7 @@ You can edit this file as you like.
   , "media-types"
   , "psci-support"
   , "simple-json"
+  , "transformers"
   , "typelevel-prelude"
   , "wai"
   , "warp"

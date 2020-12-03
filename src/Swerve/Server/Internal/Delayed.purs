@@ -157,12 +157,12 @@ runDelayed d env =
           b <- delayed.body content
           liftRouteResult (delayed.server c p h a b r)
 
-runAction :: forall env a r row. 
-  Delayed env (Aff (Resp.Response row a))
+runAction :: forall env a r. 
+  Delayed env (Aff a)
   -> env
   -> Request
   -> (RouteResult Response -> Aff r)
-  -> ((Resp.Response row a) -> RouteResult Response)
+  -> (a -> RouteResult Response)
   -> Aff r
 runAction action env req respond k = 
     runDelayed action env req >>= go >>= respond
