@@ -17,7 +17,7 @@ import Swerve.Server.Internal.Delayed (emptyDelayed)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
 import Swerve.Server.Internal.Router (runRouter)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
-import Swerve.Server.ServerError (err404)
+import Swerve.Server.Internal.ServerError (err404)
 import Swerve.Server.Internal.Response (class HasResp, Response(..), raise, respond) as Response
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)

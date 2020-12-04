@@ -3,12 +3,11 @@ module Swerve.Server.Internal.DelayedIO where
 import Prelude
 
 import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, lift, runReaderT)
-import Data.Debug.Eval as D
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect, liftEffect)
-import Network.Wai (Request(..))
-import Swerve.Server.ServerError (ServerError)
+import Effect.Class (class MonadEffect)
+import Network.Wai (Request)
+import Swerve.Server.Internal.ServerError (ServerError)
 import Swerve.Server.Internal.RouteResult (RouteResult(..), RouteResultT(..), runRouteResultT)
 
 newtype DelayedIO a = DelayedIO (ReaderT Request (RouteResultT Aff) a)

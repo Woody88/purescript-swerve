@@ -3,7 +3,7 @@ module Swerve.Server.Internal.EvalServer where
 import Swerve.Server.Internal.Delayed (Delayed)
 import Unsafe.Coerce (unsafeCoerce)
 
-class EvalServer api api' | api -> api' 
+class EvalServer (api :: Type) (api' :: Type) | api -> api' 
 
 toHoistServer :: forall server hoistServer. EvalServer server hoistServer => server -> hoistServer
 toHoistServer = unsafeCoerce

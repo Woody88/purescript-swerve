@@ -17,6 +17,7 @@ import Network.Wai (Request(..), Application, responseStr)
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
+import Swerve.API.BasicAuth (BasicAuth)
 import Swerve.API.Capture (class ReadCapture, readCapture)
 import Swerve.API.ContentType (class AllCTUnrender, class AllMime, AcceptHeader(..), canHandleAcceptH, canHandleCTypeH)
 import Swerve.API.Header (class ReadHeader, readHeader)
@@ -30,7 +31,7 @@ import Swerve.Server.Internal.EvalServer (class EvalServer, toHandler, toHoistSe
 import Swerve.Server.Internal.Response (Response(..))
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter)
-import Swerve.Server.ServerError (err400, err405, err406, err415, err500)
+import Swerve.Server.Internal.ServerError (err400, err405, err406, err415, err500)
 import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
@@ -39,6 +40,7 @@ data Server' (api :: Type)  (m :: Type -> Type)
 
 type Server spec = Server' spec Aff
  
+instance evalServerBasicAuth  :: EvalServer (Server' (BasicAuth realm usr :> api) m) ((Server' api m))
 instance evalServerAlt        :: EvalServer (Server' (a :<|> b) m) ((Server' a m) :<|> (Server' b m))
 instance evalServerRaw        :: TypeEquals Application application => EvalServer (Server' Raw m) (m application)
 instance evalServerRaise      :: EvalServer (Server' ((Raise status hdrs ctypes) :> api) m) (Server' api m)

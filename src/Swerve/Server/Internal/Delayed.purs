@@ -9,7 +9,6 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Effect.Aff (Aff)
 import Network.Wai (Request, Response)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, liftRouteResult, runDelayedIO)
-import Swerve.Server.Internal.Response (Response) as Resp
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Unsafe.Coerce (unsafeCoerce)
 

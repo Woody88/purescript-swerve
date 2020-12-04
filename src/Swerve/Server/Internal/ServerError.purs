@@ -1,4 +1,4 @@
-module Swerve.Server.ServerError where
+module Swerve.Server.Internal.ServerError where
 
 import Network.HTTP.Types as H
 import Network.Wai (Response, responseStr)
@@ -16,6 +16,18 @@ err400 :: ServerError
 err400 = { content: ""
          , headers: []
          , status: H.badRequest400
+         }
+
+err401 :: ServerError
+err401 = { content: ""
+         , headers: []
+         , status: H.unauthorized401
+         }
+
+err403 :: ServerError
+err403 = { content: ""
+         , headers: []
+         , status: H.forbidden403
          }
 
 err404 :: ServerError
