@@ -1,4 +1,4 @@
-# Swerve
+# Swerve 
 
 Swerve is a type-level server and client library heavily inspired by Haskell's Servant library. 
 A major, difference is the use of row types instead of introducing numerous combinators. 
@@ -6,43 +6,45 @@ A major, difference is the use of row types instead of introducing numerous comb
 ## Installation
 
 ***This library is not yet published to pursuit.***  
+***You will need to use purescript 0.14***  
 You can install this package by adding it to your packages.dhall:
 
 ```dhall
 let additions =
-  { swerve =
-      { dependencies =
-          [ "console"
-          , "effect"
-          , "form-urlencoded"
-          , "heterogeneous"
-          , "http-media"
-          , "http-types"
-          , "media-types"
-          , "psci-support"
-          , "record-format"
-          , "simple-json"
-          , "typelevel-prelude"
+    { warp =
+        { dependencies =
+          [ "node-fs-aff"
+          , "node-net"
+          , "node-url"
           , "wai"
-          , "warp"
           ]
-      , repo =
-          "https://github.com/Woody88/purescript-swerve.git"
-      , version =
-          "master"
-      }
-    , warp =
-      { dependencies =
-        [ "node-fs-aff"
-        , "node-net"
-        , "node-url"
-        , "wai"
-        ]
-      , repo =
-          "https://github.com/Woody88/purescript-warp.git"
-      , version =
-          "master"
-      }
+        , repo =
+            "https://github.com/Woody88/purescript-warp.git"
+        , version =
+            "master"
+        }
+    , debugged =
+        { dependencies =
+            [ "console"
+            , "effect"
+            , "prelude"
+            , "strings"
+            , "record"
+            , "ordered-collections"
+            , "either"
+            , "tuples"
+            , "lists"
+            , "arrays"
+            , "bifunctors"
+            , "generics-rep"
+            , "datetime"
+            , "enums"
+            ]
+        , repo =
+            "https://github.com/Woody88/purescript-debugged.git"
+        , version =
+            "ps-0.14"
+        } 
     , wai =
         { dependencies =
             [ "http-types"
@@ -91,7 +93,6 @@ let additions =
         , version =
             "master"
         }
-  }
 ```
 ```console
 user@user:~$ spago install swerve
@@ -100,59 +101,66 @@ user@user:~$ spago install swerve
 ## Usage 
 
 ### Basic Example
+For more examples please refer to the test folder.
+
 ```purescript 
 import Prelude
 
-import Control.Monad.Reader (asks)
-import Data.Maybe (Maybe)
+import Data.Debug.Eval as D
+import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap, wrap)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
+import Effect.Aff (Aff)
+import Effect.Aff as Aff
+import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
-import Network.Wai (Application)
-import Network.Warp.Run (runSettings)
-import Network.Warp.Settings (defaultSettings)
-import Swerve.API.Combinators (type (:<|>), (:<|>))
-import Swerve.API.MediaType (JSON, PlainText)
-import Swerve.API.Spec (Capture, Header, Header', Query, ReqBody, Resource)
-import Swerve.API.Verb (Post, Get)
-import Swerve.Server (swerve)
-import Swerve.Server.Internal.Handler (Handler)
-import Swerve.Server.Internal.Header (withHeader)
+import Network.HTTP.Types (hAuthorization, hContentType, ok200)
+import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
+import Swerve.API (type (:<|>), type (:>), BadRequest, Capture, Get, Header, JSON, NotFound, Ok, PlainText, QueryParam, Raise, Raw, ReqBody, _BadRequest, _NotFound, _Ok, (:<|>))
+import Swerve.Server (class HasResp, Response, Server, raise, respond, serve)
+import Swerve.Server (from) as Server
+import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
-import Type.Row (type (+))
 
-type UserAPI = GetUser :<|> PostUser
-type UserHandler = Handler GetUser String :<|> Handler PostUser (Header' { hello :: String } HelloWorld)
+type User = String
+type UserId = Int  
+type MaxAge = Int 
 
-type HelloWorld = { hello :: String }
+type API = GetUser :<|> GetRaw 
 
-type GetUser = Get "/user"
-    ( Resource String PlainText
-    + ()
-    )
+type GetUser 
+  = "users" 
+  :> Capture UserId 
+  :> QueryParam "maxAge" MaxAge 
+  :> ReqBody String PlainText
+  :> Raise NotFound () JSON
+  :> Get User JSON 
 
-type PostUser = Post "/user/:id?[maxAge]&[minAge]" 
-    ( Capture { id :: Int }
-    + Query { maxAge :: Maybe Int, minAge :: Maybe Int } 
-    + Header { accept :: String }
-    + ReqBody String PlainText
-    + Resource (Header' { hello :: String } HelloWorld) JSON
-    + ()
-    )
- 
-getUser :: Handler GetUser String 
-getUser = pure "User"
+type GetRaw = "raw" :> Raw 
 
-postUser :: Handler PostUser (Header' { hello :: String } HelloWorld) 
-postUser = do 
-    accept <- asks $ _.header.accept
-    Console.log accept
-    withHeader { hello: "world!" } { hello: "World!" }
+getUser :: forall rs
+  .  HasResp Ok () rs
+  => HasResp BadRequest () rs
+  => HasResp NotFound () rs
+  => UserId 
+  -> Maybe MaxAge 
+  -> String 
+  -> Aff (Response rs User) 
+getUser userId _ _ body = case userId of 
+  17        -> pure $ raise _NotFound
+  otherwise -> do
+    Console.log $ "Body: " <> body
+    pure $ respond _Ok "User1"
 
-api :: UserHandler
-api =  getUser :<|> postUser
+getRaw :: Aff Application
+getRaw = pure $ \req send -> send $ Wai.responseStr ok200 [] "Raw!"
+
+server :: Server API
+server = Server.from (getUser :<|> getRaw)
 
 app :: Application
-app = swerve (Proxy :: _ UserAPI) api
+app = serve (Proxy :: _ API) server
 
 main :: Effect Unit
 main = do 
