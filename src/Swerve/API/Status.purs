@@ -4,10 +4,6 @@ import Network.HTTP.Types as H
 import Swerve.API.Types (Status)
 import Type.Proxy (Proxy(..))
 
-
--- type Ok hdrs ctypes = Respond Ok' hdrs ctypes
--- type BadRequest hdrs ctypes = Respond BadRequest' hdrs ctypes
-
 _Ok = Proxy :: _ Ok
 _BadRequest = Proxy :: _ BadRequest
 _NotFound = Proxy :: _ NotFound

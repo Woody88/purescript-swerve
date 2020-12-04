@@ -1,4 +1,4 @@
-module Swerve.Server.Internal.ServerError where
+module Swerve.Server.ServerError where
 
 import Network.HTTP.Types as H
 import Network.Wai (Response, responseStr)

@@ -2,51 +2,43 @@ module Swerve.Server.Internal where
 
 import Prelude
 
-import Control.Monad
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (wrap, unwrap)
+import Data.Newtype (wrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
-import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Aff.Class (liftAff)
 import Effect.Ref as Ref
 import Network.HTTP.Types (Method, hAccept, hContentType)
 import Network.HTTP.Types.Method (methodGet, methodHead)
 import Network.Wai (Request(..), Application, responseStr)
-import Network.Wai as Wai
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
-import Swerve.Tagged (Tagged, untagged, retag)
 import Swerve.API.Capture (class ReadCapture, readCapture)
 import Swerve.API.ContentType (class AllCTUnrender, class AllMime, AcceptHeader(..), canHandleAcceptH, canHandleCTypeH)
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus)
-import Swerve.API.Types (type (:<|>), type (:>), Alt(..), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', Spec, Verb, (:<|>))
-import Swerve.Server.Internal.Delayed (Delayed, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, emptyDelayed, runAction, runDelayed)
+import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', Verb, (:<|>))
+import Swerve.Server.Internal.Delayed (Delayed, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
+import Swerve.Server.Internal.EvalServer (class EvalServer, toHandler, toHoistServer)
 import Swerve.Server.Internal.Response (Response(..))
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
-import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter, runRouter)
-import Swerve.Server.Internal.RoutingApplication (toApplication)
-import Swerve.Server.Internal.ServerError (err400, err404, err405, err406, err415, err500)
+import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter)
+import Swerve.Server.ServerError (err400, err405, err406, err415, err500)
 import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
-
-
-data Server' api  (m :: Type -> Type) 
+data Server' (api :: Type)  (m :: Type -> Type) 
 
 type Server spec = Server' spec Aff
  
-class EvalServer :: forall k1 k2. k1 -> k2 -> Constraint
-class EvalServer api api' | api -> api' 
-
 instance evalServerAlt        :: EvalServer (Server' (a :<|> b) m) ((Server' a m) :<|> (Server' b m))
 instance evalServerRaw        :: TypeEquals Application application => EvalServer (Server' Raw m) (m application)
 instance evalServerRaise      :: EvalServer (Server' ((Raise status hdrs ctypes) :> api) m) (Server' api m)
@@ -57,6 +49,7 @@ instance evalServerQueryParam :: IsSymbol sym => EvalServer (Server' (QueryParam
 instance evalServerHeader     :: IsSymbol sym => EvalServer (Server' (Header sym a :> api) m) (a -> Server' api m)
 instance evalServerSeg        :: IsSymbol path => EvalServer (Server' (path :> api) m) (Server' api m)
 
+class HasServer :: Type -> Row Type -> (Type -> Type) -> Type -> Constraint
 class HasServer api context m handler | api -> handler where 
   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (forall x. m x -> n x) -> Server' api m -> Server' api n
@@ -226,34 +219,4 @@ ctWildcard = "*" <> "/" <> "*"
 getAcceptHeader :: Request -> AcceptHeader
 getAcceptHeader (Request req) = AcceptHeader <<< fromMaybe ctWildcard <<< Map.lookup hAccept $ requestHeaders
   where
-    requestHeaders = Map.fromFoldable req.headers 
-
-from :: forall handler api context m. HasServer api context m handler => handler -> Server' api m
-from = unsafeCoerce
-
-toHoistServer :: forall server hoistServer. EvalServer server hoistServer => server -> hoistServer
-toHoistServer = unsafeCoerce
-
-toHoistServer' :: forall api hoistServer m. EvalServer api hoistServer => Server' api m -> hoistServer
-toHoistServer' = unsafeCoerce
-
-toHandler :: forall api api' env. EvalServer api api' => Delayed env api -> Delayed env api'
-toHandler = unsafeCoerce
-
-serve :: forall api handler. 
-  HasServer api () Aff handler
-  => Proxy api -> Server api -> Application
-serve p serv = toApplication (runRouter (const err404) (route p (Proxy :: _ Aff) {} (emptyDelayed (Route serv))))
-
--- serve' :: forall api context. 
---   HasServer api context 
---   => Proxy api -> Record context -> Server api -> Application
--- serve' p ctx serv = toApplication (runRouter (const err404) (route p ctx (emptyDelayed (Route serv))))
-
-hoistServer :: forall api ctx handler m n. 
-  HasServer api ctx m handler 
-  => Proxy api
-  -> (forall x. m x -> n x) 
-  -> Server' api m 
-  -> Server' api n
-hoistServer p = hoistServerWithContext p (Proxy :: Proxy ctx)
+    requestHeaders = Map.fromFoldable req.headers

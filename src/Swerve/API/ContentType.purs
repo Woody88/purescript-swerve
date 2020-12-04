@@ -169,12 +169,6 @@ class AllCTUnrender list a where
 instance allCTUnrender :: AllMimeUnrender ctyps a => AllCTUnrender ctyps a where
   canHandleCTypeH p ctypeH = H.mapContentMedia (allMimeUnrender p) ctypeH
 
--- handleCTypeH :: Proxy list
---               -> ByteString     -- Content-Type header
---               -> ByteString     -- Request body
---               -> Maybe (Either String a)
--- handleCTypeH p ctypeH body = ($ body) `fmap` canHandleCTypeH p ctypeH
-
 mimeUnrenderWithType :: forall ctype a. MimeUnrender ctype a => Proxy ctype -> M.MediaType -> String -> Either String a
 mimeUnrenderWithType p _ = mimeUnrender p
 

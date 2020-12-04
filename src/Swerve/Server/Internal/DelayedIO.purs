@@ -8,8 +8,8 @@ import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Network.Wai (Request(..))
+import Swerve.Server.ServerError (ServerError)
 import Swerve.Server.Internal.RouteResult (RouteResult(..), RouteResultT(..), runRouteResultT)
-import Swerve.Server.Internal.ServerError (ServerError)
 
 newtype DelayedIO a = DelayedIO (ReaderT Request (RouteResultT Aff) a)
 

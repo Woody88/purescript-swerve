@@ -1,11 +1,8 @@
 module Test.Main where
 
 import Prelude
-import Control.Monad.Reader.Class (ask)
-import Prim.Row as Row
-import Control.Monad.Reader
+
 import Data.Debug.Eval as D
-import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
 import Data.Tuple (Tuple(..))
@@ -16,19 +13,10 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Network.HTTP.Types (hAuthorization, hContentType, ok200)
 import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
-import Swerve.Tagged (Tagged(..))
-import Swerve.API.ContentType (JSON, PlainText)
-import Swerve.API.Status (BadRequest, NotFound, Ok, _BadRequest, _NotFound, _Ok)
-import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond, Respond', Spec, (:<|>))
-import Swerve.API.Verb (Get)
-import Swerve.Server.Internal (class HasServer, Server, Server', route, serve, toHandler)
-import Swerve.Server.Internal (from) as Server
-import Swerve.Server.Internal.Response (class HasResp, Response(..), raise, respond)
-import Swerve.Server.Internal.RouteResult (RouteResult(..))
-import Swerve.Server.Internal.Router (Router, leafRouter, pathRouter, runRouter, tweakResponse)
-import Swerve.Server.Internal.RoutingApplication (toApplication)
-import Swerve.Server.Internal.ServerError (err404)
-import Test.Stream
+import Swerve.API (type (:<|>), type (:>), BadRequest, Capture, Get, Header, JSON, NotFound, Ok, PlainText, QueryParam, Raise, Raw, ReqBody, _BadRequest, _NotFound, _Ok, (:<|>))
+import Swerve.Server (class HasResp, Response, Server, raise, respond, serve)
+import Swerve.Server (from) as Server
+import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 
 type User = String
@@ -46,7 +34,7 @@ type GetUser
   :> ReqBody String PlainText
   :> Raise BadRequest () JSON
   :> Raise NotFound () JSON
-  :> Get User Ok () JSON 
+  :> Get User JSON 
 
 type GetRaw = "raw" :> Raw 
 
@@ -71,7 +59,6 @@ getRaw = pure $ \req send -> send $ Wai.responseStr ok200 [] "Raw!"
 
 server :: Server API
 server = Server.from (getUser :<|> getRaw)
-
 
 app :: Wai.Application
 app = serve (Proxy :: _ API) server

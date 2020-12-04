@@ -7,7 +7,7 @@ import Data.Debug (class Debug, genericDebug)
 import Data.Generic.Rep (class Generic)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Swerve.Server.Internal.ServerError (ServerError)
+import Swerve.Server.ServerError (ServerError)
 
 -- | The result of matching against a path in the route tree.
 data RouteResult a 
