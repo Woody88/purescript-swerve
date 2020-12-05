@@ -12,6 +12,7 @@ import Swerve.Server (class HasResp, BasicAuthCheck(..), BasicAuthResult(..), Re
 import Swerve.Server as Server
 import Type.Proxy (Proxy(..))
 
+-- Defining a User type that is required by API service. 
 type Username = String
 type Password = String
 type Website  = String
@@ -32,6 +33,7 @@ derive instance eqUser   :: Eq User
 instance showUser :: Show User where 
   show (User u p w) = "(User \"" <> show u <> " \"" <> show p <> " \"" <> show w <> "\"" 
 
+-- Defining API spec and handler 
 type API = BasicAuth "People's websites" User :> "mysite" :> Get Website JSON
 
 site :: forall rs
@@ -46,6 +48,7 @@ api = Proxy
 server :: Server API
 server = Server.from site
 
+-- Defining Database 
 type UserDB = Map.Map Username User
 
 -- create a "database" from a list of users
@@ -62,6 +65,9 @@ users =
   , User "foo" "bar" "foobar.net"
   ]
 
+-- Defining context that determines what is a valid User. 
+-- This is can also be thought of as a handler that contains the compuation that knows how to validate a user
+-- If it fails swerve will return an appropriate response based on BasicAuthCheck result (ie: NoUser, BadPassword, etc...).
 checkBasicAuth :: UserDB -> BasicAuthCheck User
 checkBasicAuth db = BasicAuthCheck $ \(BasicAuthData basicAuthData) ->
   let username' = basicAuthData.username
@@ -73,6 +79,7 @@ checkBasicAuth db = BasicAuthCheck $ \(BasicAuthData basicAuthData) ->
                then pure (Authorized u)
                else pure BadPassword
 
+-- Convert our endpoint specification into a Wai Application that can be run by Warp.
 app :: Application
 app = serveWithContext api ctx server
   where 
