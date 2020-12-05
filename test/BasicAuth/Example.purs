@@ -66,7 +66,7 @@ users =
   ]
 
 -- Defining context that determines what is a valid User. 
--- This is can also be thought of as a handler that contains the compuation that knows how to validate a user
+-- This can also be thought of as a handler that contains the compuation that knows how to validate a user
 -- If it fails swerve will return an appropriate response based on BasicAuthCheck result (ie: NoUser, BadPassword, etc...).
 checkBasicAuth :: UserDB -> BasicAuthCheck User
 checkBasicAuth db = BasicAuthCheck $ \(BasicAuthData basicAuthData) ->
