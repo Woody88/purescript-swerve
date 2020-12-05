@@ -7,9 +7,11 @@ A major, difference is the use of row types instead of introducing numerous comb
 
 ***This library is not yet published to pursuit.***  
 ***You will need to use purescript 0.14***  
-You can install this package by adding it to your packages.dhall:
+You can install this package by adding the following in your packages.dhall:
 
 <details>
+<\br>
+
 ```dhall
 let additions =
     { warp =
