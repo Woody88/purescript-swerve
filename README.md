@@ -9,6 +9,7 @@ A major, difference is the use of row types instead of introducing numerous comb
 ***You will need to use purescript 0.14***  
 You can install this package by adding it to your packages.dhall:
 
+<details>
 ```dhall
 let additions =
     { warp =
@@ -97,6 +98,7 @@ let additions =
 ```console
 user@user:~$ spago install swerve
 ```
+</details>
 
 ## Usage 
 
