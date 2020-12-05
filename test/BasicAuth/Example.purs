@@ -46,7 +46,6 @@ api = Proxy
 server :: Server API
 server = Server.from site
 
--- could be a postgres connection, a file, anything.
 type UserDB = Map.Map Username User
 
 -- create a "database" from a list of users
