@@ -10,7 +10,7 @@ A major, difference is the use of row types instead of introducing numerous comb
 You can install this package by adding the following in your packages.dhall:
 
 <details>
-<\br>
+
 
 ```dhall
 let additions =
