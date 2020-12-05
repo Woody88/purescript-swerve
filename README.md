@@ -110,7 +110,6 @@ For more examples please refer to the test folder.
 ```purescript 
 import Prelude
 
-import Data.Debug.Eval as D
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
 import Data.Tuple (Tuple(..))
@@ -124,7 +123,6 @@ import Network.Wai (Application, Response(..), defaultRequest, responseStr) as W
 import Swerve.API (type (:<|>), type (:>), BadRequest, Capture, Get, Header, JSON, NotFound, Ok, PlainText, QueryParam, Raise, Raw, ReqBody, _BadRequest, _NotFound, _Ok, (:<|>))
 import Swerve.Server (class HasResp, Response, Server, raise, respond, serve)
 import Swerve.Server (from) as Server
-import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 
 type User = String
