@@ -4,7 +4,8 @@ You can edit this file as you like.
 -}
 { name = "purescript-swerve"
 , dependencies =
-  [ "b64"
+  [ "arrays"
+  , "b64"
   , "console"
   , "debugged"
   , "effect"
@@ -12,6 +13,7 @@ You can edit this file as you like.
   , "http-media"
   , "http-types"
   , "media-types"
+  , "partial"
   , "psci-support"
   , "simple-json"
   , "spec"

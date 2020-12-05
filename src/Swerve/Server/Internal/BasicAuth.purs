@@ -1,4 +1,4 @@
-module Server.Internal.BasicAuth where
+module Swerve.Server.Internal.BasicAuth where
 
 import Prelude 
 import Control.MonadZero (guard)

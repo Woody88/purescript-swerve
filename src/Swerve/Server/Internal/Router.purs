@@ -8,7 +8,6 @@ import Data.Map (Map)
 import Data.Map as M
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
-import Data.String as String
 import Data.Tuple.Nested (type (/\), (/\))
 import Network.Wai (Response)
 import Swerve.Server.Internal.ErrorFormatter (NotFoundErrorFormatter)

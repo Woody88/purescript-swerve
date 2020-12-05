@@ -17,6 +17,7 @@ import Network.Wai (Request(..), Application, responseStr)
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
+import Record as Record
 import Swerve.API.BasicAuth (BasicAuth)
 import Swerve.API.Capture (class ReadCapture, readCapture)
 import Swerve.API.ContentType (class AllCTUnrender, class AllMime, AcceptHeader(..), canHandleAcceptH, canHandleCTypeH)
@@ -25,7 +26,8 @@ import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus)
 import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', Verb, (:<|>))
-import Swerve.Server.Internal.Delayed (Delayed, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
+import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
+import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.EvalServer (class EvalServer, toHandler, toHoistServer)
 import Swerve.Server.Internal.Response (Response(..))
@@ -40,7 +42,7 @@ data Server' (api :: Type)  (m :: Type -> Type)
 
 type Server spec = Server' spec Aff
  
-instance evalServerBasicAuth  :: EvalServer (Server' (BasicAuth realm usr :> api) m) ((Server' api m))
+instance evalServerBasicAuth  :: EvalServer (Server' (BasicAuth realm usr :> api) m) (usr -> (Server' api m))
 instance evalServerAlt        :: EvalServer (Server' (a :<|> b) m) ((Server' a m) :<|> (Server' b m))
 instance evalServerRaw        :: TypeEquals Application application => EvalServer (Server' Raw m) (m application)
 instance evalServerRaise      :: EvalServer (Server' ((Raise status hdrs ctypes) :> api) m) (Server' api m)
@@ -52,7 +54,7 @@ instance evalServerHeader     :: IsSymbol sym => EvalServer (Server' (Header sym
 instance evalServerSeg        :: IsSymbol path => EvalServer (Server' (path :> api) m) (Server' api m)
 
 class HasServer :: Type -> Row Type -> (Type -> Type) -> Type -> Constraint
-class HasServer api context m handler | api -> handler where 
+class HasServer api context m handler | api -> handler context where 
   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (forall x. m x -> n x) -> Server' api m -> Server' api n
 
@@ -198,6 +200,18 @@ instance hasServerSegment ::
   route _ m ctx subserver = pathRouter path (route (Proxy :: _ api) m ctx (toHandler subserver))
     where 
       path = reflectSymbol (SProxy :: _ path)
+
+instance hasServerBasicAuth ::
+  ( IsSymbol realm 
+  , HasServer api (basicAuth :: BasicAuthCheck usr | context) m handler
+  ) => HasServer (BasicAuth realm usr :> api) (basicAuth :: BasicAuthCheck usr | context) m (usr -> handler) where
+  hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (toHoistServer s)
+  route _ m ctx subserver = route (Proxy :: Proxy api) m ctx ((toHandler subserver) `addAuthCheck` authCheck)
+    where
+       realm = reflectSymbol (SProxy :: _ realm)
+       basicAuthContext = Record.get (SProxy :: _ "basicAuth") ctx
+       authCheck = withRequest \req -> runBasicAuth req realm basicAuthContext
+
 
 allowedMethodHead :: Method -> Request -> Boolean
 allowedMethodHead method (Request req) = method == methodGet && (show req.method) == methodHead

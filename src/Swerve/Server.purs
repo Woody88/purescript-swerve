@@ -1,8 +1,9 @@
 module Swerve.Server 
   ( module Response
   , module ServerType
+  , module BasicAuth 
   , serve
-  , serve' 
+  , serveWithContext 
   , hoistServer
   , from 
   ) where
@@ -13,6 +14,7 @@ import Effect.Aff (Aff)
 import Network.Wai (Application) 
 import Swerve.Server.Internal (Server, Server') as ServerType
 import Swerve.Server.Internal (class HasServer, Server, Server', hoistServerWithContext, route)
+import Swerve.Server.Internal.BasicAuth (BasicAuthCheck(..), BasicAuthResult(..)) as BasicAuth
 import Swerve.Server.Internal.Delayed (emptyDelayed)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
 import Swerve.Server.Internal.Router (runRouter)
@@ -27,10 +29,10 @@ serve :: forall api handler.
   => Proxy api -> Server api -> Application
 serve p s = toApplication (runRouter (const err404) (route p (Proxy :: _ Aff) {} (emptyDelayed (Route s))))
 
-serve' :: forall api context handler. 
+serveWithContext :: forall api context handler. 
   HasServer api context Aff handler
   => Proxy api -> Record context -> Server api -> Application
-serve' p ctx s = toApplication (runRouter (const err404) (route p (Proxy :: _ Aff) ctx (emptyDelayed (Route s))))
+serveWithContext p ctx s = toApplication (runRouter (const err404) (route p (Proxy :: _ Aff) ctx (emptyDelayed (Route s))))
 
 hoistServer :: forall api ctx handler m n. 
   HasServer api ctx m handler 
