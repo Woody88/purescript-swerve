@@ -2,11 +2,13 @@ module Swerve.Server.Internal where
 
 import Prelude
 
-import Data.Either (Either(..))
+import Data.Array ((:))
+import Data.Either (Either(..), either)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (wrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Aff.Class (liftAff)
@@ -18,24 +20,27 @@ import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
 import Record as Record
+import Swerve.API.Auth (AuthProtect)
 import Swerve.API.BasicAuth (BasicAuth)
 import Swerve.API.Capture (class ReadCapture, readCapture)
-import Swerve.API.ContentType (class AllCTUnrender, class AllMime, AcceptHeader(..), canHandleAcceptH, canHandleCTypeH)
+import Swerve.API.ContentType (class Accepts, class AllCTRender, class AllCTUnrender, class AllMime, AcceptHeader(..), handleAcceptH, canHandleAcceptH, canHandleCTypeH)
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus)
 import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', Verb, (:<|>))
+import Swerve.Server.Internal.Auth (AuthHandler, unAuthHandler)
 import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
 import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.EvalServer (class EvalServer, toHandler, toHoistServer)
-import Swerve.Server.Internal.Response (Response(..))
+import Swerve.Server.Internal.Response (RespondData, Response(..))
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter)
-import Swerve.Server.Internal.ServerError (err400, err405, err406, err415, err500)
+import Swerve.Server.Internal.ServerError (ServerError, err400, err405, err406, err415, err500)
 import Type.Equality (class TypeEquals)
 import Type.Proxy (Proxy(..))
+import Type.Row as Row
 import Unsafe.Coerce (unsafeCoerce)
 
 data Server' (api :: Type)  (m :: Type -> Type) 
@@ -80,7 +85,8 @@ instance hasServerRaw ::
 instance hasServerVerb :: 
   ( HasStatus status
   , ToMethod method
-  , AllMime ctypes
+  , Accepts ctypes
+  , AllCTRender ctypes a
   , EvalServer (Server' (Verb method a status hdrs ctypes) m) (m (Response rs a))
   ) => HasServer (Verb method a status hdrs ctypes) context m (m (Response (Either (Respond' status hdrs) l) a)) where 
   hoistServerWithContext _ _ nt s = unsafeCoerce (nt $ toHoistServer s)
@@ -96,8 +102,14 @@ instance hasServerVerb ::
                                        `addAcceptCheck` acceptCheck ctypesP accH
         runAction action env request respond 
           \(Response v) -> case v of 
-              Right s -> Route $ responseStr s.status [] s.content
               Left f  -> Route $ responseStr f.status [] f.content
+              Right (s :: RespondData a) -> case handleAcceptH ctypesP accH s.content of 
+                Nothing -> FailFatal err406 
+                Just (ct /\ body) -> 
+                  let bdy     = if allowedMethodHead method request then "" else body
+                      headers = (hContentType /\ ct) :  s.headers 
+                  in Route $ responseStr s.status headers bdy
+              
 
 instance hasServerRaise :: 
   ( HasStatus status
@@ -213,6 +225,20 @@ instance hasServerBasicAuth ::
        basicAuthContext = Record.get (SProxy :: _ "basicAuth") ctx
        authCheck = withRequest \req -> runBasicAuth req realm basicAuthContext
 
+instance hasServerAuth ::
+  ( IsSymbol tag 
+  , EvalServer (Server' (AuthProtect tag :> api) m) (a -> (Server' api m))
+  , HasServer api context m handler
+  , Row.Cons tag (AuthHandler Request a) r context 
+  ) => HasServer (AuthProtect tag :> api) context m (a -> handler) where
+  hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: _ api) pc nt <<< (toHoistServer s)
+  route _ m ctx subserver = route (Proxy :: Proxy api) m ctx ((toHandler subserver) `addAuthCheck` (withRequest authCheck))
+    where 
+      authCheck :: Request -> DelayedIO (Aff a) 
+      authCheck req = (liftAff $ authHandler req) >>= (either delayedFailFatal (pure <<< pure))
+
+      authHandler :: Request -> Aff (Either ServerError a)
+      authHandler = unAuthHandler $ Record.get (SProxy :: _ tag) ctx
 
 allowedMethodHead :: Method -> Request -> Boolean
 allowedMethodHead method (Request req) = method == methodGet && (show req.method) == methodHead

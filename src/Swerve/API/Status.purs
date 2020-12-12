@@ -7,8 +7,10 @@ import Type.Proxy (Proxy(..))
 _Ok = Proxy :: _ Ok
 _BadRequest = Proxy :: _ BadRequest
 _NotFound = Proxy :: _ NotFound
+_Forbidden = Proxy :: _ Forbidden
 
 foreign import data Ok :: Status
+foreign import data Forbidden :: Status
 foreign import data BadRequest :: Status
 foreign import data NotFound :: Status
 
@@ -24,3 +26,6 @@ instance hasStatusBadRequest :: HasStatus BadRequest where
 
 instance hasStatusNotFound :: HasStatus NotFound where 
   getStatus _ = H.notFound404
+
+instance hasStatusForbidden :: HasStatus Forbidden where 
+  getStatus _ = H.forbidden403

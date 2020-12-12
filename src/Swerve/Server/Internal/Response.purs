@@ -4,10 +4,9 @@ import Prelude
 
 import Data.Either (Either(..))
 import Network.HTTP.Types as H
-import Simple.JSON (writeJSON)
-import Simple.JSON as JSON
 import Swerve.API.Status (class HasStatus, getStatus)
 import Swerve.API.Types (Respond', Status)
+import Swerve.Server.Internal.ServerError (ServerError)
 import Type.Proxy (Proxy(..))
 
 class HasResp (status :: Status) (hdrs :: Row Type) (rs :: Type) 
@@ -17,10 +16,13 @@ else instance hasRespLeft :: HasResp a hdrs (Either (Respond' a hdrs) b)
 else instance hasRespRight :: HasResp a hdrs b => HasResp a hdrs (Either c b)
 
 newtype Response :: forall k. k -> Type -> Type
-newtype Response rs (a :: Type) = Response (Either RespondData RespondData)
+newtype Response rs (a :: Type) = Response (Either ServerError (RespondData a))
 
-type RespondData 
-  = { content :: String 
+unResponse :: forall rs a. Response rs a -> (Either ServerError (RespondData a))
+unResponse (Response resp) = resp 
+
+type RespondData a 
+  = { content :: a 
     , headers :: H.ResponseHeaders
     , status  :: H.Status
     }
@@ -35,13 +37,22 @@ raise st = Response $
          , headers: []
          }
 
+raise' :: forall a rs status. 
+  HasResp status ()  rs 
+  => HasStatus status 
+  => Proxy status -> String -> Response rs a 
+raise' st s = Response $ 
+    Left { content: s
+         , status: getStatus st
+         , headers: []
+         }
+
 respond :: forall a rs status. 
   HasResp status () rs
-  => JSON.WriteForeign a
   => HasStatus status  
   => Proxy status -> a -> Response rs a 
 respond st a = Response $ 
-  Right { content: writeJSON a 
+  Right { content: a 
         , status: getStatus (Proxy :: _ status)
         , headers: []
         }

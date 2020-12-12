@@ -7,9 +7,11 @@ module Swerve.API
   , module Method 
   , module QueryParam 
   , module BasicAuth
+  , module Auth
   ) 
   where 
 
+import Swerve.API.Auth as Auth
 import Swerve.API.BasicAuth as BasicAuth 
 import Swerve.API.Types as Types 
 import Swerve.API.Status as Status 
