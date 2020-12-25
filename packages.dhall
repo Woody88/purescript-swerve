@@ -134,7 +134,7 @@ let overrides =
     , type-equality =
         upstream.type-equality // { version = "master" }
     , variant = 
-        upstream.variant // { repo = "https://github.com/JordanMartinez/purescript-variant.git", version = "polykindsUpdate" }
+        upstream.variant // { repo = "https://github.com/Woody88/purescript-variant.git", version = "polykindsUpdate" }
     }
 
 let additions = 
