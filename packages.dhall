@@ -212,7 +212,6 @@ let additions =
             , "newtype"
             , "numbers"
             , "ordered-collections"
-            , "proxy"
             , "strings"
             , "stringutils"
             , "unicode"
