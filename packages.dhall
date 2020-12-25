@@ -122,7 +122,7 @@ let upstream =
       https://raw.githubusercontent.com/purescript/package-sets/prepare-0.14/src/packages.dhall sha256:462b0c3503e621142518935bf779555eef593317785f74bd5607bd7ebddf6036
 
 let overrides =   
-    { metadata = upstream.metadata // { version = "v0.14.0-rc2" }
+    { metadata = upstream.metadata // { version = "v0.14.0-rc4" }
     , prelude =
         upstream.prelude // { version = "cfd87116c9dd1eeeb75cf83ffaeac0224f159ed9" }
     , record =
@@ -130,7 +130,9 @@ let overrides =
     , simple-json =
         upstream.simple-json // { version = "ps-0.14" }
     , typelevel-prelude =
-        upstream.typelevel-prelude // { version = "ps-0.14" }
+        upstream.typelevel-prelude // { version = "master" }
+    , type-equality =
+        upstream.type-equality // { version = "master" }
     , variant = 
         upstream.variant // { repo = "https://github.com/JordanMartinez/purescript-variant.git", version = "polykindsUpdate" }
     }
