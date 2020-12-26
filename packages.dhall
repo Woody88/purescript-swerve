@@ -133,8 +133,6 @@ let overrides =
         upstream.typelevel-prelude // { version = "master" }
     , type-equality =
         upstream.type-equality // { version = "master" }
-    , http-media =
-        upstream.http-media // { version = "ps-0.14" }
     , variant = 
         upstream.variant // { repo = "https://github.com/Woody88/purescript-variant.git", version = "polykindsUpdate" }
     }
