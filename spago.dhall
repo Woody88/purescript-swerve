@@ -12,17 +12,12 @@ You can edit this file as you like.
   , "form-urlencoded"
   , "http-media"
   , "http-types"
-  , "media-types"
-  , "partial"
   , "psci-support"
   , "simple-json"
-  , "spec"
-  , "stringutils"
-  , "transformers"
-  , "typelevel-prelude"
+  , "node-http"
   , "wai"
   , "warp"
   ]
 , packages = ./packages.dhall
-, sources = [ "src/**/*.purs", "test/**/*.purs" ]
+, sources = [ "src/**/*.purs" ]
 }
