@@ -53,8 +53,7 @@ class HasServer api context m handler | api -> handler context where
   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (forall x. m x -> n x) -> Server' api m -> Server' api n
 
 instance hasServerAlt :: 
-  ( EvalServer (Server' (a :<|> b) m) ((Server' a m) :<|> (Server' b m))
-  , HasServer a context m handlera
+  ( HasServer a context m handlera
   , HasServer b context m handlerb
   ) => HasServer (a :<|> b) context m (handlera :<|> handlerb) where 
   hoistServerWithContext _ pc nt server = let 
@@ -113,7 +112,6 @@ instance hasServerVerb ::
 
 instance hasServerRaise :: 
   ( HasStatus status
-  , EvalServer (Server' ((Raise status hdrs ctypes) :> api) m) (Server' api m)
   , HasServer api context m (m (Response handler a)) 
   ) => HasServer ((Raise status hdrs ctypes) :> api) context m (m (Response (Either (Respond' status hdrs) handler) a)) where 
   hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: Proxy api) pc nt (toHoistServer s)
@@ -157,7 +155,6 @@ instance hasServerReqBody ::
 
 instance hasServerCapture :: 
   ( ReadCapture a
-  , EvalServer (Server' (Capture a :> api) m) (a -> Server' api m)
   , HasServer api context m handler
   ) => HasServer (Capture a :> api) context m (a -> handler) where 
   hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (toHoistServer s)
@@ -172,7 +169,6 @@ instance hasServerCapture ::
 instance hasServerHeader :: 
   ( IsSymbol sym
   , ReadHeader a
-  , EvalServer (Server' (Header sym a :> api) m) (a -> Server' api m)
   , HasServer api context m handler
   ) => HasServer (Header sym a :> api) context m (a -> handler) where 
   hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (toHoistServer s)
@@ -189,7 +185,6 @@ instance hasServerHeader ::
 instance hasServerQuery :: 
   ( IsSymbol sym
   , ReadQuery a
-  , EvalServer (Server' (QueryParam sym a :> api) m) (Maybe a -> Server' api m)
   , HasServer api context m handler
   ) => HasServer (QueryParam sym a :> api) context m (Maybe a -> handler) where 
   hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (toHoistServer s)
@@ -205,7 +200,6 @@ instance hasServerQuery ::
 
 instance hasServerSegment :: 
   ( IsSymbol path
-  , EvalServer (Server' (path :> api) m) (Server' api m)
   , HasServer api context m handler
   ) => HasServer (path :> api) context m handler where 
   hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: _ api) pc nt (toHoistServer s)
@@ -215,7 +209,6 @@ instance hasServerSegment ::
 
 instance hasServerBasicAuth ::
   ( IsSymbol realm 
-  , EvalServer (Server' (BasicAuth realm usr :> api) m) (usr -> (Server' api m))
   , HasServer api (basicAuth :: BasicAuthCheck usr | context) m handler
   ) => HasServer (BasicAuth realm usr :> api) (basicAuth :: BasicAuthCheck usr | context) m (usr -> handler) where
   hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (toHoistServer s)
@@ -227,7 +220,6 @@ instance hasServerBasicAuth ::
 
 instance hasServerAuth ::
   ( IsSymbol tag 
-  , EvalServer (Server' (AuthProtect tag :> api) m) (a -> (Server' api m))
   , HasServer api context m handler
   , Row.Cons tag (AuthHandler Request a) r context 
   ) => HasServer (AuthProtect tag :> api) context m (a -> handler) where
