@@ -14,6 +14,28 @@ foreign import data Forbidden :: Status
 foreign import data BadRequest :: Status
 foreign import data NotFound :: Status
 
+foreign import data NoContent' :: Status 
+foreign import data Ok' :: Status
+foreign import data Forbidden' :: Status
+foreign import data BadRequest' :: Status
+
+class HasStatus' a where 
+  statusOf :: Proxy a -> H.Status 
+
+instance hasStatusNoContent' :: HasStatus' NoContent' where 
+  statusOf _ = H.noContent204
+
+instance hasStatusOk' :: HasStatus' Ok' where 
+  statusOf _ = H.ok200
+
+instance hasStatusBadRequest' :: HasStatus' BadRequest' where 
+  statusOf _ = H.badRequest400
+
+instance hasStatusWithStatus :: HasStatus' status => HasStatus' (WithStatus status a) where 
+  statusOf _ = statusOf (Proxy :: _ status)
+
+data WithStatus (k :: Status) a = WithStatus (Proxy k) a
+
 class HasStatus :: forall k. k -> Symbol -> Constraint
 class HasStatus a label | a -> label where 
   getStatus :: Proxy a -> H.Status

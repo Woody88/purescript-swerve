@@ -19,6 +19,7 @@ import Network.HTTP.Media as Media
 import Prim.TypeError as TE
 import Simple.JSON (class WriteForeign)
 import Simple.JSON as Json
+import Swerve.API.Status (WithStatus(..))
 import Swerve.API.Types (type (:<|>), ContentType)
 import Type.Proxy (Proxy(..))
 
@@ -77,8 +78,14 @@ class MimeRender :: forall k. k -> Type -> Constraint
 class Accepts ctype <= MimeRender ctype a where
     mimeRender  :: Proxy ctype -> a -> String 
 
-instance mimeRenderJson :: Json.WriteForeign a => MimeRender JSON a where 
+instance mimeRenderWithStatusJsob :: MimeRender JSON a => MimeRender JSON (WithStatus status a) where
+    mimeRender p (WithStatus _ a) = mimeRender p a 
+
+else instance mimeRenderJson :: Json.WriteForeign a => MimeRender JSON a where 
     mimeRender _ = Json.writeJSON
+
+instance mimeRenderWithStatusText :: MimeRender PlainText a => MimeRender PlainText (WithStatus status a) where
+    mimeRender p (WithStatus _ a) = mimeRender p a 
 
 instance mimeRenderPlainTextString :: MimeRender PlainText String where 
     mimeRender _ = identity
@@ -125,7 +132,10 @@ class MimeUnrender :: forall k. k -> Type -> Constraint
 class Accepts ctype <= MimeUnrender ctype a where
     mimeUnrender :: Proxy ctype -> String -> Either String a    
 
-instance mimeUnrenderJson :: Json.ReadForeign a => MimeUnrender JSON a where 
+instance mimeUnrenderWithStatusJson :: MimeUnrender JSON a => MimeUnrender JSON (WithStatus status a) where  
+    mimeUnrender p input = WithStatus Proxy <$> mimeUnrender p input
+
+else instance mimeUnrenderJson :: Json.ReadForeign a => MimeUnrender JSON a where 
     mimeUnrender _ = lmap renderError <<< Json.readJSON 
         where 
             renderError :: Foreign.MultipleErrors -> String 

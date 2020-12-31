@@ -53,6 +53,9 @@ instance evalServerRaise
 instance evalServerVerb 
   :: EvalServer (ServerT (Verb method a status hdrs ctypes) m) (m a)
 
+instance evalServerSVerb 
+  :: EvalServer (ServerT (SVerb method ctypes as) m) (m as)
+
 instance evalServerRaw 
   :: TypeEquals Application waiApp 
   => EvalServer (ServerT Raw m) (m waiApp)
@@ -115,6 +118,10 @@ instance evalDelayedVerb
   :: EvalDelayed (Delayed env (ServerT (Verb method a status hdrs ctypes) m)) 
                  (Delayed env (m (Response rs a)))
 
+instance evalDelayedSVerb
+  :: EvalDelayed (Delayed env (ServerT (SVerb method ctype as) m)) 
+                 (Delayed env (m as))
+
 instance evalDelayedRaw
   :: TypeEquals Application waiApp 
   => EvalDelayed (Delayed env (ServerT Raw m)) 
@@ -169,6 +176,8 @@ instance evalHandlerRaise ::
   )=> EvalHandler (Raise status hdrs ctypes :> api) server
 
 instance evalHandlerVerb :: EvalHandler (Verb method a status hdrs ct) (m (Response rs a))
+
+instance evalHandlerSVerb :: EvalHandler (SVerb method ctypes as) (m as)
 
 instance evalHandlerRaw 
   :: TypeEquals Application waiApp 

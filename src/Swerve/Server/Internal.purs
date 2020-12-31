@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Array ((:))
 import Data.Either (Either(..), either)
+import Data.Either.Inject 
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (wrap)
@@ -27,8 +28,8 @@ import Swerve.API.ContentType (class Accepts, class AllCTRender, class AllCTUnre
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
-import Swerve.API.Status (class HasStatus)
-import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', Verb, (:<|>))
+import Swerve.API.Status (class HasStatus, class HasStatus', statusOf)
+import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', SVerb, Verb, (:<|>))
 import Swerve.Server.Internal.Auth (AuthHandler, unAuthHandler)
 import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
 import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
@@ -71,6 +72,34 @@ instance hasServerAlt ::
     where
       pa = Proxy :: _ a 
       pb = Proxy :: _ b 
+
+instance hasServerSVerb :: 
+  ( HasStatus' a
+  , ToMethod method
+  , Accepts ctypes
+  , AllCTRender ctypes a
+  , Inject a as 
+  ) => HasServer (SVerb method ctypes as) context m where 
+  hoistServerWithContext _ _ nt server = lift $ nt $ eval server
+  route _ _ _ subserver = leafRouter route'
+    where 
+      method = toMethod (Proxy :: _ method)
+      ctypesP = Proxy :: _ ctypes 
+      route' env request respond = do 
+        let 
+          accH   = getAcceptHeader request
+          action = (evalD subserver) `addMethodCheck` methodCheck method request
+                                       `addAcceptCheck` acceptCheck ctypesP accH
+        runAction action env request respond 
+          \(v :: as) -> case prj v of 
+              Nothing -> FailFatal err500   -- is this right? 
+              Just (s :: a) -> case handleAcceptH ctypesP accH s of 
+                Nothing -> FailFatal err406 
+                Just (ct /\ body) -> 
+                  let bdy     = if allowedMethodHead method request then "" else body
+                      headers = [(hContentType /\ ct)]  -- :  s.headers   <-- need to handle headers later
+                      status  = statusOf (Proxy :: _ a)   
+                  in Route $ responseStr status headers bdy
 
 instance hasServerVerb :: 
   ( HasStatus status label

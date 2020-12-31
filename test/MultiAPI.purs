@@ -17,7 +17,7 @@ import Swerve.API
 import Swerve.API (type (:<|>), type (:>), BadRequest, Capture, Get, Header, JSON, NotFound, Ok, PlainText, QueryParam, Raise, Raw, ReqBody, _BadRequest, _NotFound, _Ok, (:<|>))
 import Swerve.Server (Response, raise, respond, serve)
 import Swerve.Server (Server, ServerT)
-import Swerve.Server (eval, compose, lift) as Server
+import Swerve.Server (eval, lift) as Server
 import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 
