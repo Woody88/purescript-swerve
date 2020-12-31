@@ -14,18 +14,18 @@ foreign import data Forbidden :: Status
 foreign import data BadRequest :: Status
 foreign import data NotFound :: Status
 
-class HasStatus :: forall k. k -> Constraint
-class HasStatus a where 
+class HasStatus :: forall k. k -> Symbol -> Constraint
+class HasStatus a label | a -> label where 
   getStatus :: Proxy a -> H.Status
 
-instance hasStatusOk :: HasStatus Ok where 
+instance hasStatusOk :: HasStatus Ok "ok" where 
   getStatus _ = H.ok200
 
-instance hasStatusBadRequest :: HasStatus BadRequest where 
+instance hasStatusBadRequest :: HasStatus BadRequest "badRequest" where 
   getStatus _ = H.badRequest400
 
-instance hasStatusNotFound :: HasStatus NotFound where 
+instance hasStatusNotFound :: HasStatus NotFound "notFound" where 
   getStatus _ = H.notFound404
 
-instance hasStatusForbidden :: HasStatus Forbidden where 
+instance hasStatusForbidden :: HasStatus Forbidden "forbidden" where 
   getStatus _ = H.forbidden403

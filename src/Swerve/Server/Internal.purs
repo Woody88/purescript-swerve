@@ -33,7 +33,7 @@ import Swerve.Server.Internal.Auth (AuthHandler, unAuthHandler)
 import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
 import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
-import Swerve.Server.Internal.Eval (Server, ServerT, lift, eval, evalD)
+import Swerve.Server.Internal.Eval (class EvalServer, Server, ServerT, lift, eval, evalD)
 import Swerve.Server.Internal.Response (RespondData, Response(..))
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter)
@@ -42,7 +42,7 @@ import Type.Equality (class TypeEquals)
 import Type.Equality as TypeEquals 
 import Type.Proxy (Proxy(..))
 import Type.Row as Row
-import Unsafe.Coerce (unsafeCoerce)
+import Unsafe.Coerce
 
 -- data Server' (api :: Type)  (m :: Type -> Type) 
 
@@ -57,28 +57,28 @@ class HasServer api context m | api -> context m where
   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (m ~> n) -> ServerT api m -> ServerT api n
 
--- instance hasServerAlt :: 
---   ( HasServer a context m
---   , HasServer b context m
---   ) => HasServer (a :<|> b) context m where 
---   hoistServerWithContext _ pc nt server = let 
---     (servera :<|> serverb) = (lift server)
---     in 
---       lift (hoistServerWithContext (Proxy :: _ a) pc nt servera :<|> hoistServerWithContext (Proxy :: _ b) pc nt serverb)
+instance hasServerAlt :: 
+  ( HasServer a context m
+  , HasServer b context m
+  ) => HasServer (a :<|> b) context m where 
+  hoistServerWithContext _ pc nt server = let 
+    (servera :<|> serverb) = (eval server)
+    in 
+      lift (hoistServerWithContext (Proxy :: _ a) pc nt servera :<|> hoistServerWithContext (Proxy :: _ b) pc nt serverb)
 
---   route _ m context server = choice (route pa m context ((\ (a :<|> _) -> a) <$> eval server))
---                                     (route pb m context ((\ (_ :<|> b) -> b) <$> eval server))
---     where
---       pa = Proxy :: _ a 
---       pb = Proxy :: _ b 
+  route _ m context server = choice (route pa m context ((\ (a :<|> _) -> a) <$> evalD server))
+                                    (route pb m context ((\ (_ :<|> b) -> b) <$> evalD server))
+    where
+      pa = Proxy :: _ a 
+      pb = Proxy :: _ b 
 
 instance hasServerVerb :: 
-  ( HasStatus status
+  ( HasStatus status label
   , ToMethod method
   , Accepts ctypes
   , AllCTRender ctypes a
   ) => HasServer (Verb method a status hdrs ctypes) context m where 
-  hoistServerWithContext _ _ nt server = unsafeCoerce $ nt $ eval server
+  hoistServerWithContext _ _ nt server = lift $ nt $ eval server
   route _ _ _ subserver = leafRouter route'
     where 
       status = Proxy :: _ status 
@@ -98,140 +98,141 @@ instance hasServerVerb ::
                   let bdy     = if allowedMethodHead method request then "" else body
                       headers = (hContentType /\ ct) :  s.headers 
                   in Route $ responseStr s.status headers bdy
-              
+
+instance hasServerRaise :: 
+  ( HasStatus status label
+  , HasServer api context m 
+  ) => HasServer (Raise status hdrs ctypes :> api) context m where 
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt (eval s)
+  route _ m ctx subserver = route (Proxy :: _ api) m ctx (evalD subserver) 
+
 instance hasServerSegment :: 
   ( IsSymbol path
   , HasServer api context m
   ) => HasServer (path :> api) context m where 
-  hoistServerWithContext _ pc nt s = do 
-    unsafeCoerce $ hoistServerWithContext (Proxy :: _ api) pc nt (eval s)
-
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: _ api) pc nt (eval s)
   route _ m ctx subserver = pathRouter path (route (Proxy :: _ api) m ctx (evalD subserver))
     where 
       path = reflectSymbol (SProxy :: _ path) 
 
--- instance hasServerRaw :: HasServer Raw context m where 
---   hoistServerWithContext _ _ f m  = unsafeCoerce $ f (eval m)
---   route _ _ _ rawApplication = RawRouter $ \env request respond -> do   
---     r <- runDelayed (toHandler rawApplication) env request
---     case r of 
---       Route appM -> do 
---         app <- appM
---         app request (respond <<< Route)
---       Fail a      -> respond $ Fail a 
---       FailFatal e -> respond $ FailFatal e
+instance hasServerRaw :: HasServer Raw context m where 
+  hoistServerWithContext _ _ f m  = lift (f $ eval m)
+  route _ _ _ rawApplication = RawRouter $ \env request respond -> do   
+    r <- runDelayed (evalD rawApplication) env request
+    case r of 
+      Route appM -> do 
+        app <- appM
+        app request (respond <<< Route)
+      Fail a      -> respond $ Fail a 
+      FailFatal e -> respond $ FailFatal e
 
--- instance hasServerRaise :: 
---   ( HasStatus status
---   , HasServer api context m 
---   ) => HasServer ((Raise status hdrs ctypes) :> api) context m where 
---   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt (eval s)
---   route _ m ctx subserver = route (Proxy :: _ api) m ctx (eval subserver) 
+instance hasServerReqBody :: 
+  ( AllCTUnrender ctypes a
+  , HasServer api context m 
+  ) => HasServer (ReqBody a ctypes :> api) context m where 
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
+  route _ m context subserver = route (Proxy :: Proxy api) m context $ addBodyCheck (evalD subserver) ctCheck bodyCheck
+    where 
+      ctCheck = withRequest $ \(Request req) -> do
+        let hdrs = Map.fromFoldable req.headers 
+            contentTypeH = fromMaybe "application/octet-stream" $ Map.lookup hContentType hdrs
+        case canHandleCTypeH (Proxy :: Proxy ctypes) contentTypeH :: Maybe (String -> Either String a) of
+          Nothing -> delayedFail err415
+          Just f  -> pure f
 
--- instance hasServerReqBody :: 
---   ( AllCTUnrender ctypes a
---   , HasServer api context m 
---   ) => HasServer (ReqBody a ctypes :> api) context m where 
---   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
---   route _ m context subserver = route (Proxy :: Proxy api) m context $ addBodyCheck (eval subserver) ctCheck bodyCheck
---     where 
---       ctCheck = withRequest $ \(Request req) -> do
---         let hdrs = Map.fromFoldable req.headers 
---             contentTypeH = fromMaybe "application/octet-stream" $ Map.lookup hContentType hdrs
---         case canHandleCTypeH (Proxy :: Proxy ctypes) contentTypeH :: Maybe (String -> Either String a) of
---           Nothing -> delayedFail err415
---           Just f  -> pure f
+      bodyCheck f = withRequest $ \request -> do
+        mrqbody <- f <$> liftAff (requestBody request)
 
---       bodyCheck f = withRequest $ \request -> do
---         mrqbody <- f <$> liftAff (requestBody request)
+        case mrqbody of
+          Left e  -> delayedFailFatal $ err500 { content = e }
+          Right v -> pure v
 
---         case mrqbody of
---           Left e  -> delayedFailFatal $ err500 { content = e }
---           Right v -> pure v
+      requestBody (Request req) = Aff.makeAff \done -> do
+        case req.body of 
+          Nothing     -> done $ Right "" 
+          Just stream -> do 
+            bufs <- Ref.new []
 
---       requestBody (Request req) = Aff.makeAff \done -> do
---         case req.body of 
---           Nothing     -> done $ Right "" 
---           Just stream -> do 
---             bufs <- Ref.new []
+            Stream.onData stream \buf ->
+              void $ Ref.modify (_ <> [buf]) bufs
 
---             Stream.onData stream \buf ->
---               void $ Ref.modify (_ <> [buf]) bufs
-
---             Stream.onEnd stream do
---               body <- Ref.read bufs >>= Buffer.concat >>= Buffer.toString UTF8
---               done $ Right body
---         pure Aff.nonCanceler
+            Stream.onEnd stream do
+              body <- Ref.read bufs >>= Buffer.concat >>= Buffer.toString UTF8
+              done $ Right body
+        pure Aff.nonCanceler
 
 instance hasServerCapture :: 
   ( ReadCapture a
   , HasServer api context m 
   ) => HasServer (Capture a :> api) context m where 
-  hoistServerWithContext _ pc nt s = unsafeCoerce $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
+
   route _ m ctx subserver =
     CaptureRouter $ 
       route (Proxy :: _ api) m ctx
-        (addCapture (eval subserver) \c -> withRequest \request -> 
+        (addCapture (evalD subserver) \c -> withRequest \request -> 
           case readCapture c of 
             Nothing           -> delayedFail err400 
             Just (piece :: a) -> pure piece)
 
--- instance hasServerHeader :: 
---   ( IsSymbol sym
---   , ReadHeader a
---   , HasServer api context m
---   ) => HasServer (Header sym a :> api) context m where 
---   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
---   route _ m ctx subserver = route (Proxy :: _ api) m ctx delayed
---     where 
---       delayed = addHeaderCheck (eval subserver) <<< withRequest $ 
---         \(Request req) -> let 
---           key = reflectSymbol (SProxy :: _ sym)
---           hMap = Map.fromFoldable $ req.headers 
---           in case Map.lookup (wrap key) hMap >>= readHeader of 
---             Nothing -> delayedFail err400 { content = req.url }
---             Just (piece :: a) -> pure piece
+instance hasServerHeader :: 
+  ( IsSymbol sym
+  , ReadHeader a
+  , HasServer api context m
+  ) => HasServer (Header sym a :> api) context m where 
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
+  route _ m ctx subserver = route (Proxy :: _ api) m ctx delayed
+    where 
+      delayed = addHeaderCheck (evalD subserver) <<< withRequest $ 
+        \(Request req) -> let 
+          key = reflectSymbol (SProxy :: _ sym)
+          hMap = Map.fromFoldable $ req.headers 
+          in case Map.lookup (wrap key) hMap >>= readHeader of 
+            Nothing -> delayedFail err400 { content = req.url }
+            Just (piece :: a) -> pure piece
 
--- instance hasServerQuery :: 
---   ( IsSymbol sym
---   , ReadQuery a
---   , HasServer api context m
---   ) => HasServer (QueryParam sym a :> api) context m where 
---   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
---   route _ m ctx subserver = route (Proxy :: _ api) m ctx delayed
---     where 
---       delayed = addParameterCheck (eval subserver) <<< withRequest $ 
---         \(Request req) -> let 
---           key = reflectSymbol (SProxy :: _ sym)
---           qMap = Map.fromFoldable $ req.queryString
---           in case Map.lookup key qMap >>= (\mParam -> mParam >>= readQuery) of 
---             Nothing -> delayedFail err400 { content = req.url }
---             Just (piece :: Maybe a) -> pure piece
+instance hasServerQuery :: 
+  ( IsSymbol sym
+  , ReadQuery a
+  , HasServer api context m
+  ) => HasServer (QueryParam sym a :> api) context m where 
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
+  route _ m ctx subserver = route (Proxy :: _ api) m ctx delayed
+    where 
+      delayed = addParameterCheck (evalD subserver) <<< withRequest $ 
+        \(Request req) -> let 
+          key = reflectSymbol (SProxy :: _ sym)
+          qMap = Map.fromFoldable $ req.queryString
+          in case Map.lookup key qMap of 
+            Nothing      -> delayedFail err400 { content = req.url }
+            Just mParam  -> case mParam of 
+              Nothing    -> delayedFail err400 { content = req.url } 
+              Just param -> pure $ readQuery param
 
--- instance hasServerBasicAuth ::
---   ( IsSymbol realm 
---   , HasServer api (basicAuth :: BasicAuthCheck usr | context) m 
---   ) => HasServer (BasicAuth realm usr :> api) (basicAuth :: BasicAuthCheck usr | context) m where
---   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
---   route _ m ctx subserver = route (Proxy :: Proxy api) m ctx ((eval subserver) `addAuthCheck` authCheck)
---     where
---        realm = reflectSymbol (SProxy :: _ realm)
---        basicAuthContext = Record.get (SProxy :: _ "basicAuth") ctx
---        authCheck = withRequest \req -> runBasicAuth req realm basicAuthContext
+instance hasServerBasicAuth ::
+  ( IsSymbol realm 
+  , HasServer api (basicAuth :: BasicAuthCheck usr | context) m 
+  ) => HasServer (BasicAuth realm usr :> api) (basicAuth :: BasicAuthCheck usr | context) m where
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
+  route _ m ctx subserver = route (Proxy :: Proxy api) m ctx ((evalD subserver) `addAuthCheck` authCheck)
+    where
+       realm = reflectSymbol (SProxy :: _ realm)
+       basicAuthContext = Record.get (SProxy :: _ "basicAuth") ctx
+       authCheck = withRequest \req -> runBasicAuth req realm basicAuthContext
 
--- instance hasServerAuth ::
---   ( IsSymbol tag 
---   , HasServer api context m
---   , Row.Cons tag (AuthHandler Request a) r context 
---   ) => HasServer (AuthProtect tag :> api) context m where
---   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: _ api) pc nt <<< (eval s)
---   route _ m ctx subserver = route (Proxy :: Proxy api) m ctx ((eval subserver) `addAuthCheck` (withRequest authCheck))
---     where 
---       authCheck :: Request -> DelayedIO (Aff a) 
---       authCheck req = (liftAff $ authHandler req) >>= (either delayedFailFatal (pure <<< pure))
+instance hasServerAuth ::
+  ( IsSymbol tag 
+  , HasServer api context m
+  , Row.Cons tag (AuthHandler Request a) r context 
+  ) => HasServer (AuthProtect tag :> api) context m where
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: _ api) pc nt <<< (eval s)
+  route _ m ctx subserver = route (Proxy :: Proxy api) m ctx ((evalD subserver) `addAuthCheck` (withRequest authCheck))
+    where 
+      authCheck :: Request -> DelayedIO (Aff a) 
+      authCheck req = (liftAff $ authHandler req) >>= (either delayedFailFatal (pure <<< pure))
 
---       authHandler :: Request -> Aff (Either ServerError a)
---       authHandler = unAuthHandler $ Record.get (SProxy :: _ tag) ctx
+      authHandler :: Request -> Aff (Either ServerError a)
+      authHandler = unAuthHandler $ Record.get (SProxy :: _ tag) ctx
 
 allowedMethodHead :: Method -> Request -> Boolean
 allowedMethodHead method (Request req) = method == methodGet && (show req.method) == methodHead

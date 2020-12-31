@@ -8,38 +8,63 @@ import Network.Wai (Application, Request)
 import Swerve.API.Auth
 import Swerve.API.BasicAuth
 import Swerve.API.Types
+import Swerve.API.Status (class HasStatus)
 import Swerve.Server.Internal.Auth
 import Swerve.Server.Internal.Delayed (Delayed)
 import Swerve.Server.Internal.Response
 import Swerve.Server.Internal.Handler 
 import Type.Equality (class TypeEquals)
+import Type.Row as Row
 import Unsafe.Coerce (unsafeCoerce)
 
 data ServerT (api :: Type)  (m :: Type -> Type) 
 
-type Server spec = ServerT spec Handler 
 
-class EvalServer a b | a -> b 
+type Server spec = ServerT spec Aff 
 
+class EvalServer a b | a -> b
 
-instance evalAltHandlers :: 
-  ( EvalServer (ServerT a m) a'
-  , EvalServer (ServerT b m) b'
-  ) => EvalServer (ServerT (a :<|> b) m) (a' :<|> b')
+instance evalServerAlt :: EvalServer (ServerT (a :<|> b) m) ((ServerT a m) :<|> (ServerT b m))
 
-else instance evalPath :: 
-  ( IsSymbol path 
-  -- , EvalServer (ServerT api m) server
-  ) => EvalServer (ServerT (path :> api) m) (ServerT api m)
+instance evalServerAlt' :: EvalServer ((ServerT a m) :<|> (ServerT b m)) (ServerT (a :<|> b) m)
 
+instance evalServerPath 
+  :: IsSymbol path 
+  => EvalServer (ServerT (path :> api) m) (ServerT api m) 
 
-else instance evalCapture
-  :: EvalServer (ServerT api m) server 
-  => EvalServer (ServerT (Capture a :> api) m) (a -> server)
+instance evalServerReqBody 
+  :: EvalServer (ServerT (ReqBody a ctypes :> api) m) (a -> (ServerT api m))
 
-else instance evalVerb :: EvalServer (ServerT (Verb method a status hdrs ct) m) (m a)
+instance evalServerCapture 
+  :: EvalServer (ServerT (Capture a :> api) m) (a -> (ServerT api m))
 
-else instance evalI :: EvalServer a b
+instance evalServerHeader 
+  :: IsSymbol sym
+  => EvalServer (ServerT (Header sym a :> api) m) (a -> (ServerT api m))
+
+instance evalServerQueryParam 
+  :: IsSymbol sym
+  => EvalServer (ServerT (QueryParam sym a :> api) m) (Maybe a -> (ServerT api m))
+
+instance evalServerRaise 
+  :: EvalServer (ServerT (Raise status hdrs ctypes :> api) m)
+                (ServerT api m)
+
+instance evalServerVerb 
+  :: EvalServer (ServerT (Verb method a status hdrs ctypes) m) (m a)
+
+instance evalServerRaw 
+  :: TypeEquals Application waiApp 
+  => EvalServer (ServerT Raw m) (m waiApp)
+
+instance evalServerBasicAuth
+  :: EvalServer (ServerT (BasicAuth realm usr :> api) m) 
+                (usr -> ServerT api m)
+
+instance evalServerAuth
+  :: EvalServer (ServerT (AuthProtect tag :> api) m)
+                (a -> ServerT api m)
+
 
 -- instance evalServerSub :: EvalServer a b
 
@@ -64,83 +89,90 @@ instance evalDelayedPath
   :: IsSymbol path 
   => EvalDelayed (Delayed env (ServerT (path :> api) m)) (Delayed env (ServerT api m))
 
--- instance evalDelayedReqBody 
---   :: EvalServer' (Delayed env (ServerT ((ReqBody a ctypes) :> api) m)) 
---                  (Delayed env (a -> ServerT api m))
+instance evalDelayedReqBody 
+  :: EvalDelayed (Delayed env (ServerT (ReqBody a ctypes :> api) m)) 
+                 (Delayed env (a -> ServerT api m))
 
--- instance evalDelayedRaise :: EvalServer' (Delayed env (ServerT ((Raise status hdrs ctypes) :> api) m))
---                                          (Delayed env (ServerT api m))
+instance evalDelayedRaise 
+  :: EvalDelayed (Delayed env (ServerT (Raise status hdrs ctypes :> api) m))
+                 (Delayed env (ServerT api m))
 
 instance evalDelayedCapture 
   :: EvalDelayed (Delayed env (ServerT (Capture a :> api) m)) 
                  (Delayed env (a -> ServerT api m))
 
+instance evalDelayedHeader 
+  :: IsSymbol sym
+  => EvalDelayed (Delayed env (ServerT (Header sym a :> api) m)) 
+                 (Delayed env (a -> ServerT api m))
+
+instance evalDelayedQueryParam
+  :: IsSymbol sym
+  => EvalDelayed (Delayed env (ServerT (QueryParam sym a :> api) m)) 
+                 (Delayed env (Maybe a -> ServerT api m))
 
 instance evalDelayedVerb
   :: EvalDelayed (Delayed env (ServerT (Verb method a status hdrs ctypes) m)) 
                  (Delayed env (m (Response rs a)))
 
--- instance evalDelayedHeader
---   :: EvalServer' (Delayed env (ServerT (Header sym a :> api) m)) 
---                  (Delayed env (a -> ServerT api m))
-
--- instance evalDelayedQueryParam
---   :: EvalServer' (Delayed env (ServerT (QueryParam sym a :> api) m)) 
---                  (Delayed env (Maybe a -> ServerT api m))
+instance evalDelayedRaw
+  :: TypeEquals Application waiApp 
+  => EvalDelayed (Delayed env (ServerT Raw m)) 
+                 (Delayed env (m waiApp))
              
--- instance evalDelayedBasicAuth
---   :: EvalServer' (Delayed env (ServerT (BasicAuth realm usr :> api) m)) 
---                  (Delayed env (usr -> ServerT api m))
+instance evalDelayedBasicAuth
+  :: EvalDelayed (Delayed env (ServerT (BasicAuth realm usr :> api) m)) 
+                 (Delayed env (usr -> ServerT api m))
 
--- instance evalDelayedAuth
---   :: EvalServer' (Delayed env (ServerT (AuthProtect tag :> api) m)) 
---                  (Delayed env (m a -> ServerT api m))
+instance evalDelayedAuth
+  :: EvalDelayed (Delayed env (ServerT (AuthProtect tag :> api) m)) 
+                 (Delayed env (a -> ServerT api m))
 
 -- Server Compose Eval 
-instance evalAltServers :: EvalHandler (ServerT a m :<|> ServerT b m) (ServerT (a :<|> b) m)
+-- instance evalAltServers :: EvalHandler (ServerT a m :<|> ServerT b m) (ServerT (a :<|> b) m)
 
 
 -- Server Eval
 
 instance evalAltHandlers' :: 
-  ( EvalHandler (ServerT a m) a'
-  , EvalHandler (ServerT b m) b'
-  ) => EvalHandler (ServerT (a :<|> b) m) (a' :<|> b')
+  ( EvalHandler a a'
+  , EvalHandler  b b'
+  ) => EvalHandler (a :<|> b) (a' :<|> b')
 
 class EvalHandler a b | a -> b
 
-instance evalPath' :: 
+instance evalHandlerPath :: 
   ( IsSymbol path 
   , EvalHandler api server
   ) => EvalHandler (path :> api) server
 
-instance evalCapture'
+instance evalHandlerReqBody 
+  :: EvalHandler api server 
+  => EvalHandler (ReqBody a ctypes :> api) (a -> server)
+
+instance evalHandlerCapture
   :: EvalHandler api server 
   => EvalHandler (Capture a :> api) (a -> server)
 
-instance evalVerb' :: EvalHandler (Verb method a status hdrs ct) (m a)
+instance evalHandlerHeader
+  :: EvalHandler api server 
+  => EvalHandler (Header sym a :> api) (a -> server)
 
--- instance evalRaw 
---   :: TypeEquals Application application 
---   => EvalServer' (ServerT Raw m) (m application)
+instance evalHandlerQueryParam
+  :: EvalHandler api server 
+  => EvalHandler (QueryParam sym a :> api) (Maybe a -> server)
 
--- instance evalRaise 
---   :: EvalServer (ServerT api m) server 
---   => EvalServer' (ServerT ((Raise status hdrs ctypes) :> api) m) server
+instance evalHandlerRaise :: 
+  ( HasStatus status label
+  , EvalHandler api server 
+  , Row.Cons label (Respond status () ct) r rs
+  )=> EvalHandler (Raise status hdrs ctypes :> api) server
 
--- instance evalReqBody 
---   :: EvalServer (ServerT api m) server 
---   => EvalServer' (ServerT (ReqBody a ctypes :> api) m) (a -> server)
+instance evalHandlerVerb :: EvalHandler (Verb method a status hdrs ct) (m (Response rs a))
 
-
-
--- instance evalHeader
---   :: EvalServer (ServerT api m) server 
---   => EvalServer' (ServerT (Header sym a :> api) m) (a -> server)
-
--- instance evalQueryParam
---   :: EvalServer (ServerT api m) server 
---   => EvalServer' (ServerT (QueryParam sym a :> api) m) (Maybe a -> server)
+instance evalHandlerRaw 
+  :: TypeEquals Application waiApp 
+  => EvalHandler Raw (m waiApp)
 
 -- instance evalBasicAuth
 --   :: EvalServer (ServerT api m) server 
@@ -158,11 +190,5 @@ evalD = unsafeCoerce
 eval :: forall a b. EvalServer a b => a -> b
 eval = unsafeCoerce
 
--- eval :: forall a b. EvalServer' a b => a -> b
--- eval = unsafeCoerce
-
 lift :: forall a b. EvalServer b a => a -> b
 lift = unsafeCoerce
-
-compose :: forall a b. EvalServer b a => b -> a
-compose = unsafeCoerce

@@ -5,7 +5,7 @@ import Data.Either
 import Effect.Aff 
 import Swerve.Server.Internal.Response 
 
-newtype Handler a = Handler a      
+newtype Handler e a = Handler (Either e a)      
 
 -- handler :: Handler _ User 
 -- handler = respond $ Ok (mkUser 1 "woodson")
