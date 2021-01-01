@@ -3,6 +3,8 @@ module Swerve.API.Header where
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
 
+data Header (s :: Symbol) (a :: Type)
+
 class ReadHeader a where 
   readHeader :: String -> Maybe a 
 
@@ -13,6 +15,4 @@ instance readHeaderInt :: ReadHeader Int where
   readHeader = Int.fromString
 
 instance readHeaderMaybe :: ReadHeader a => ReadHeader (Maybe a) where 
-  readHeader = readHeader 
-
-class WithHeader (hdrs :: Row Type)
+  readHeader = readHeader

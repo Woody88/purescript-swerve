@@ -1,25 +1,22 @@
 module Swerve.API.Verb where
 
-import Swerve.API.Status (Ok)
-import Swerve.API.Types (Method', Verb)
+import Swerve.API.Method (GET', POST', PUT', PATCH', DELETE')
+import Swerve.API.Types (Method', ContentType')
 
-foreign import data GET'    :: Method'
-foreign import data POST'   :: Method'
-foreign import data PUT'    :: Method'
-foreign import data PATCH'  :: Method'
-foreign import data DELETE' :: Method'
+data Verb :: forall k. Method' -> ContentType' -> k -> Type
+data Verb m cts as 
 
-type Get a ctypes = Verb GET' a Ok () ctypes
-type Get' a status hdrs ctypes = Verb GET' a status hdrs ctypes
+type Get :: forall k. k -> ContentType' -> Type
+type Get cts a    = Verb GET' a cts
 
-type Post a ctypes = Verb POST' a Ok  () ctypes
-type Post' a status hdrs ctypes = Verb POST' a status hdrs ctypes
+type Post :: forall k. k -> ContentType' -> Type
+type Post cts a   = Verb POST' a cts
 
-type Put a ctypes = Verb PUT' a Ok  () ctypes
-type Put' a status hdrs ctypes = Verb PUT' a status hdrs ctypes 
+type Put :: forall k. k -> ContentType' -> Type
+type Put cts a    = Verb PUT' a cts
 
-type Patch a ctypes = Verb PATCH' a Ok  () ctypes 
-type Patch' a status hdrs ctypes = Verb PATCH' a status hdrs ctypes 
+type Patch :: forall k. k -> ContentType' -> Type
+type Patch cts a  = Verb PATCH' a cts 
 
-type Delete a ctypes = Verb DELETE' a Ok  () ctypes 
-type Delete' a status hdrs ctypes = Verb DELETE' a status hdrs ctypes
+type Delete :: forall k. k -> ContentType' -> Type
+type Delete cts a = Verb DELETE' a cts

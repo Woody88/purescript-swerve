@@ -1,4 +1,4 @@
-module Swerve.API.SVerb where
+module Swerve.Server.SVerb where
   
 import Swerve.API.Status 
 import Swerve.API.ContentType 

@@ -3,6 +3,8 @@ module Swerve.API.QueryParam where
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
 
+data QueryParam (s :: Symbol) (a :: Type)
+
 class ReadQuery a where 
   readQuery :: String -> Maybe a 
 
@@ -13,4 +15,4 @@ instance readQueryInt :: ReadQuery Int where
   readQuery = Int.fromString
 
 instance readQueryMaybe :: ReadQuery a => ReadQuery (Maybe a) where 
-  readQuery = readQuery 
+  readQuery = readQuery
