@@ -8,7 +8,9 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested (type (/\), (/\))
 import Effect.Aff (Aff)
 import Network.Wai (Request, Response)
+
 import Swerve.Server.Internal.DelayedIO (DelayedIO, liftRouteResult, runDelayedIO)
+import Swerve.Server.Internal.Handler
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -157,7 +159,7 @@ runDelayed d env =
           liftRouteResult (delayed.server c p h a b r)
 
 runAction :: forall env a r. 
-  Delayed env (Aff a)
+  Delayed env (HandlerM a)
   -> env
   -> Request
   -> (RouteResult Response -> Aff r)
@@ -169,5 +171,5 @@ runAction action env req respond k =
     go (Fail e)      = pure $ Fail e
     go (FailFatal e) = pure $ FailFatal e
     go (Route a)     = do
-      x  <- a
+      x  <- runHandler a
       pure $ k x

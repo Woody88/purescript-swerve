@@ -9,6 +9,8 @@ module Swerve.API
   , module QueryParam 
   , module Status
   , module Sub
+  , module Raw
+  , module ReqBody
   , module Types
   , module Verb
   ) 
@@ -22,7 +24,9 @@ import Swerve.API.ContentType (class MimeRender, class MimeUnrender, class Accep
 import Swerve.API.Header (class ReadHeader, Header, readHeader) as Header 
 import Swerve.API.Method (class ToMethod, toMethod) as Method
 import Swerve.API.QueryParam (class ReadQuery, QueryParam, readQuery) as QueryParam
-import Swerve.API.Status (class HasStatus, BadRequest', Forbidden', NoContent', Ok', WithStatus(..), statusOf) as Status 
+import Swerve.API.Raw (Raw) as Raw
+import Swerve.API.ReqBody (ReqBody) as ReqBody
+import Swerve.API.Status (class HasStatus, NotFound', BadRequest', Forbidden', NoContent', Ok', WithStatus(..), statusOf) as Status 
 import Swerve.API.Sub (type (:>), Sub) as Sub 
 import Swerve.API.Types (ContentType', Method', Status', Verb') as Types 
 import Swerve.API.Verb (Delete, Get, Patch, Post, Put, Verb) as Verb 

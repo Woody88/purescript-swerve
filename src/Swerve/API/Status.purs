@@ -8,6 +8,7 @@ foreign import data NoContent' :: Status'
 foreign import data Ok' :: Status'
 foreign import data Forbidden' :: Status'
 foreign import data BadRequest' :: Status'
+foreign import data NotFound' :: Status'
 
 data WithStatus (k :: Status') a = WithStatus (Proxy k) a
 
@@ -23,6 +24,9 @@ instance hasStatus200 :: HasStatus Ok' "200" where
 
 instance hasStatus400 :: HasStatus BadRequest' "400" where 
   statusOf _ = H.badRequest400
+
+instance hasStatus404 :: HasStatus NotFound' "404" where 
+  statusOf _ = H.notFound404
 
 instance hasStatus403 :: HasStatus Forbidden' "403" where 
   statusOf _ = H.forbidden403

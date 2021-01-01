@@ -3,7 +3,6 @@ module Swerve.Server.Internal.Eval where
 import Data.Maybe (Maybe)
 import Data.Symbol (class IsSymbol)
 import Data.Variant (Variant)
-import Effect.Aff (Aff)
 import Network.Wai (Application)
 import Swerve.API.Alternative (type (:<|>))
 import Swerve.API.Auth (AuthProtect)
@@ -16,11 +15,12 @@ import Swerve.API.Raw (Raw)
 import Swerve.API.ReqBody  (ReqBody)
 import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Delayed (Delayed)
+import Swerve.Server.Internal.Handler (HandlerM)
 import Type.Equality (class TypeEquals)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Server type to be used as an associated type.
-type Server spec = ServerT spec Aff 
+type Server spec = ServerT spec HandlerM 
 data ServerT (api :: Type) (m :: Type -> Type) 
 
 -- Server Eval 
@@ -96,10 +96,15 @@ instance evalDelayedSVerb
   :: EvalDelayed (Delayed env (ServerT (Verb method ctype as) m)) 
                  (Delayed env (m (Variant as)))
 
+-- instance evalDelayedRaw
+--   :: TypeEquals Application waiApp 
+--   => EvalDelayed (Delayed env (ServerT Raw m)) 
+--                  (Delayed env waiApp)
+
 instance evalDelayedRaw
   :: TypeEquals Application waiApp 
   => EvalDelayed (Delayed env (ServerT Raw m)) 
-                 (Delayed env (m waiApp))
+                 (Delayed env (n waiApp))
              
 instance evalDelayedBasicAuth
   :: EvalDelayed (Delayed env (ServerT (BasicAuth realm usr :> api) m)) 
