@@ -23,6 +23,7 @@ module Swerve.API.ContentType
     , allMime
     , allMimeRender
     , allMimeUnrender
+    , canHandleAcceptH
     , canHandleCTypeH
     , contentType
     , contentTypes

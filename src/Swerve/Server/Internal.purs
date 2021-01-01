@@ -2,16 +2,13 @@ module Swerve.Server.Internal where
 
 import Prelude
 
-import Data.Variant
-import Data.Variant as V
-import Data.Array ((:))
+import Data.Variant (Variant)
 import Data.Either (Either(..), either)
-import Data.Either.Inject 
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype, wrap, unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
@@ -21,44 +18,36 @@ import Heterogeneous.Folding (class Folding, class FoldlVariant, class HFoldl, C
 import Network.HTTP.Types as H
 import Network.HTTP.Types (Method, hAccept, hContentType)
 import Network.HTTP.Types.Method (methodGet, methodHead)
-import Network.Wai (Request(..), Application, responseStr)
+import Network.Wai (Request(..), responseStr)
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
 import Record as Record
+import Swerve.API.Alternative (type (:<|>), (:<|>))
 import Swerve.API.Auth (AuthProtect)
 import Swerve.API.BasicAuth (BasicAuth)
-import Swerve.API.Capture (class ReadCapture, readCapture)
-import Swerve.API.ContentType (class MimeRender, class Accepts, class AllCTRender, class AllCTUnrender, class AllMime, AcceptHeader(..), handleAcceptH, canHandleAcceptH, canHandleCTypeH)
-import Swerve.API.Header (class ReadHeader, readHeader)
+import Swerve.API.Capture (class ReadCapture, Capture, readCapture )
+import Swerve.API.ContentType (class Accept, class AllCTRender, class AllCTUnrender, class AllMime, AcceptHeader(..), canHandleAcceptH, canHandleCTypeH, handleAcceptH)
+import Swerve.API.Header (class ReadHeader, Header, readHeader )
 import Swerve.API.Method (class ToMethod, toMethod)
-import Swerve.API.QueryParam (class ReadQuery, readQuery)
-import Swerve.API.Status (class HasStatus, class HasStatus', statusOf)
-import Swerve.API.Types (type (:<|>), type (:>), ContentType, Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', SVerb, Verb, (:<|>))
+import Swerve.API.QueryParam (class ReadQuery, QueryParam, readQuery )
+import Swerve.API.Raw (Raw)
+import Swerve.API.ReqBody  (ReqBody)
+import Swerve.API.Status (class HasStatus, statusOf)
+import Swerve.API.Sub (type (:>))
+import Swerve.API.Types (ContentType')
+import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Auth (AuthHandler, unAuthHandler)
 import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
 import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
-import Swerve.Server.Internal.Eval (class EvalServer, Server, ServerT, lift, eval, evalD)
-import Swerve.Server.Internal.Response (RespondData, Response(..))
+import Swerve.Server.Internal.Eval (Server, ServerT, lift, eval, evalD)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter)
 import Swerve.Server.Internal.ServerError (ServerError, err400, err405, err406, err415, err500)
-import Type.Equality (class TypeEquals)
-import Type.Equality as TypeEquals 
 import Type.Proxy (Proxy(..))
 import Type.Row as Row
-import Type.RowList (class RowToList, RowList)
-import Unsafe.Coerce
-
--- data Server' (api :: Type)  (m :: Type -> Type) 
-
--- type Server spec = Server' spec Aff
-
--- class HasServer :: Type -> Row Type -> (Type -> Type) -> Type -> Constraint
--- class HasServer api context m handler | api -> handler context where 
---   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
---   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (forall x. m x -> n x) -> Server' api m -> Server' api n
+import Type.RowList (class RowToList)
 
 class HasServer api context m | api -> context m where 
   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
@@ -79,14 +68,14 @@ instance hasServerAlt ::
       pa = Proxy :: _ a 
       pb = Proxy :: _ b 
 
-data EncodeResponse (ctypes :: ContentType) = EncodeResponse AcceptHeader
+data EncodeResponse (ctypes :: ContentType') = EncodeResponse AcceptHeader
 
 newtype EncodedResponse = EncodedResponse (Tuple H.Status (Maybe (Tuple String String)))
 
 derive instance newtypeEncodedResponse :: Newtype EncodedResponse _
 
 instance foldingEncodeResponse ::
-  ( HasStatus' a label
+  ( HasStatus a label
   , AllCTRender ctypes a
   ) => Folding (EncodeResponse ctypes) EncodedResponse a EncodedResponse where
   folding (EncodeResponse accH) _ a = EncodedResponse $ (statusOf (Proxy :: _ a)) /\ (handleAcceptH ctypesP accH a)
@@ -105,10 +94,10 @@ encodeResponse v p accH = hfoldl ((EncodeResponse accH) :: EncodeResponse ctypes
 
 instance hasServerSVerb :: 
   ( ToMethod method
-  , Accepts ctypes 
+  , Accept ctypes 
   , FoldlVariant (ConstFolding (EncodeResponse ctypes)) EncodedResponse rl as EncodedResponse
   , RowToList as rl
-  ) => HasServer (SVerb method ctypes as) context m where 
+  ) => HasServer (Verb method ctypes as) context m where 
   hoistServerWithContext _ _ nt server = lift $ nt $ eval server
   route _ _ _ subserver = leafRouter route'
     where 
@@ -126,40 +115,6 @@ instance hasServerSVerb ::
               bdy     = if allowedMethodHead method request then "" else body
               headers = [(hContentType /\ ct)]  -- :  s.headers   <-- need to handle headers later
               in Route $ responseStr status headers bdy
-
-instance hasServerVerb :: 
-  ( HasStatus status label
-  , ToMethod method
-  , Accepts ctypes
-  , AllCTRender ctypes a
-  ) => HasServer (Verb method a status hdrs ctypes) context m where 
-  hoistServerWithContext _ _ nt server = lift $ nt $ eval server
-  route _ _ _ subserver = leafRouter route'
-    where 
-      status = Proxy :: _ status 
-      method = toMethod (Proxy :: _ method)
-      ctypesP = Proxy :: _ ctypes 
-      route' env request respond = do 
-        let 
-          accH   = getAcceptHeader request
-          action = (evalD subserver) `addMethodCheck` methodCheck method request
-                                       `addAcceptCheck` acceptCheck ctypesP accH
-        runAction action env request respond 
-          \(Response v) -> case v of 
-              Left f  -> Route $ responseStr f.status [] f.content
-              Right (s :: RespondData a) -> case handleAcceptH ctypesP accH s.content of 
-                Nothing -> FailFatal err406 
-                Just (ct /\ body) -> 
-                  let bdy     = if allowedMethodHead method request then "" else body
-                      headers = (hContentType /\ ct) :  s.headers 
-                  in Route $ responseStr s.status headers bdy
-
-instance hasServerRaise :: 
-  ( HasStatus status label
-  , HasServer api context m 
-  ) => HasServer (Raise status hdrs ctypes :> api) context m where 
-  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt (eval s)
-  route _ m ctx subserver = route (Proxy :: _ api) m ctx (evalD subserver) 
 
 instance hasServerSegment :: 
   ( IsSymbol path
@@ -184,7 +139,7 @@ instance hasServerRaw :: HasServer Raw context m where
 instance hasServerReqBody :: 
   ( AllCTUnrender ctypes a
   , HasServer api context m 
-  ) => HasServer (ReqBody a ctypes :> api) context m where 
+  ) => HasServer (ReqBody ctypes a :> api) context m where 
   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
   route _ m context subserver = route (Proxy :: Proxy api) m context $ addBodyCheck (evalD subserver) ctCheck bodyCheck
     where 
@@ -219,7 +174,7 @@ instance hasServerReqBody ::
 instance hasServerCapture :: 
   ( ReadCapture a
   , HasServer api context m 
-  ) => HasServer (Capture a :> api) context m where 
+  ) => HasServer (Capture sym a :> api) context m where 
   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: Proxy api) pc nt <<< (eval s)
 
   route _ m ctx subserver =

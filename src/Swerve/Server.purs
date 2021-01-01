@@ -1,6 +1,5 @@
 module Swerve.Server 
-  ( module Response
-  , module ServerType
+  ( module ServerType
   , module Auth
   , module BasicAuth 
   , module ServerError
@@ -10,7 +9,7 @@ module Swerve.Server
   , lift
   ) where
 
-import Prelude 
+import Prelude (const)
 
 import Effect.Aff (Aff)
 import Network.Wai (Application) 
@@ -24,9 +23,8 @@ import Swerve.Server.Internal.RoutingApplication (toApplication)
 import Swerve.Server.Internal.Router (runRouter)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.ServerError (ServerError, err400, err401, err403, err404, err405, err406, err415, err500, responseServerError) as ServerError
-import Swerve.Server.Internal.Response (Response(..), raise, respond) as Response
 import Type.Proxy (Proxy(..))
-import Unsafe.Coerce 
+import Unsafe.Coerce (unsafeCoerce)
 
 serve :: forall api. 
   HasServer api () Aff
