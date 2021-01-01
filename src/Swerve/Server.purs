@@ -1,8 +1,9 @@
 module Swerve.Server 
-  ( module ServerType
-  , module Auth
+  ( module Auth
   , module BasicAuth 
   , module ServerError
+  , module ServerType
+  , module Status
   , serve
   , serveWithContext 
   , hoistServer
@@ -22,6 +23,7 @@ import Swerve.Server.Internal.Delayed (emptyDelayed)
 import Swerve.Server.Internal.RoutingApplication (toApplication)
 import Swerve.Server.Internal.Router (runRouter)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
+import Swerve.Server.Status (BadRequest, Ok, Void) as Status
 import Swerve.Server.Internal.ServerError (ServerError, err400, err401, err403, err404, err405, err406, err415, err500, responseServerError) as ServerError
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)

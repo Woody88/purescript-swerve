@@ -17,10 +17,8 @@ import Data.Newtype (wrap, unwrap)
 import Data.Tuple 
 import Network.HTTP.Types 
 import Network.Wai as Wai
-import Swerve.API (type (:>), GET', JSON, SVerb,Capture,  WithStatus(..))
-import Swerve.API.ContentType 
-import Swerve.API.Status (class HasStatus', Ok', BadRequest')
-import Swerve.API.SVerb
+
+import Swerve.API 
 import Swerve.Server
 import Swerve.Server (lift) as Server
 import Test.Stream (newStream)
@@ -32,8 +30,8 @@ type Handler r = Aff (Variant r)
 
 type LoginAPI
   = "login"
-  :> Capture Int 
-  :> SVerb GET' JSON (Ok String + BadRequest + Void)
+  :> Capture "id" Int 
+  :> Get JSON (Ok String + BadRequest + Void)
 
 login :: Int -> Handler (Ok String + BadRequest + Void)
 login = pure <<< case _ of 
