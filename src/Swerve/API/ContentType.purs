@@ -1,4 +1,36 @@
-module Swerve.API.ContentType where
+module Swerve.API.ContentType 
+    (
+    -- * Provided Content-Types
+      JSON
+    , PlainText
+    , FormUrlEncoded
+
+    -- * Building your own Content-Type
+    , class Accept
+    , class MimeRender
+    , class MimeUnrender
+
+    -- * NoContent
+    , NoContent(..)
+
+    -- * Internal
+    , AcceptHeader (..)
+    , class AllCTRender
+    , class AllCTUnrender
+    , class AllMime
+    , class AllMimeRender
+    , class AllMimeUnrender
+    , allMime
+    , allMimeRender
+    , allMimeUnrender
+    , canHandleCTypeH
+    , contentType
+    , contentTypes
+    , handleAcceptH
+    , mimeRender
+    , mimeUnrender
+    )
+    where
 
 import Prelude
 
@@ -38,23 +70,23 @@ instance writeForeignNoContent :: WriteForeign NoContent where
 
 derive instance eqAcceptHeader :: Eq AcceptHeader
 
-class Accepts :: forall k. k -> Constraint
-class Accepts ctype where 
+class Accept :: forall k. k -> Constraint
+class Accept ctype where 
   contentTypes  :: Proxy ctype -> NonEmptyArray MediaType
   contentType :: Proxy ctype -> MediaType
 
 
-instance acceptJson :: Accepts JSON where 
+instance acceptJson :: Accept JSON where 
     contentType _ = "application" // "json"
 
     contentTypes p = NE.singleton $ contentType p
 
-instance acceptPlainText :: Accepts PlainText where 
+instance acceptPlainText :: Accept PlainText where 
     contentType _ = "text" // "plain"
     
     contentTypes p = NE.singleton $ contentType p
 
-instance acceptFormUrlEncoded :: Accepts FormUrlEncoded where 
+instance acceptFormUrlEncoded :: Accept FormUrlEncoded where 
     contentType _ = "application" // "x-www-form-urlencoded"
 
     contentTypes p = NE.singleton $ contentType p
@@ -65,7 +97,7 @@ class AllMime ctypes <= AllCTRender ctypes a where
 
 instance allCTRenderUnit :: 
     (TE.Fail (TE.Text "No instance for Unit, use NoContent instead.")
-    , Accepts ctype
+    , Accept ctype
     ) => AllCTRender ctype Unit where
     handleAcceptH _ _ _ = Nothing
 
@@ -79,7 +111,7 @@ else instance allCTRender' ::
             lkup = map (\(Tuple a b) -> Tuple a (Tuple (Media.renderHeader a) b)) amrs
 
 class MimeRender :: forall k. k -> Type -> Constraint
-class Accepts ctype <= MimeRender ctype a where
+class Accept ctype <= MimeRender ctype a where
     mimeRender  :: Proxy ctype -> a -> String 
 
 instance mimeRenderWithStatusJsob :: MimeRender JSON a => MimeRender JSON (WithStatus status a) where
@@ -107,13 +139,13 @@ class AllMime :: forall k. k -> Constraint
 class AllMime ctypes where 
     allMime :: Proxy ctypes -> Array MediaType 
 
-instance allMimeAlt :: (AllMime ctypes, Accepts ctype, Accepts ctypes)  => AllMime (ctype :<|> ctypes) where 
+instance allMimeAlt :: (AllMime ctypes, Accept ctype, Accept ctypes)  => AllMime (ctype :<|> ctypes) where 
     allMime _ =  Array.cons (contentType pctype) $ allMime pctypes
         where 
             pctype  = Proxy :: Proxy ctype 
             pctypes = Proxy :: Proxy ctypes
 
-else instance allMimeBase :: Accepts ctype => AllMime ctype where 
+else instance allMimeBase :: Accept ctype => AllMime ctype where 
     allMime ctype = [contentType ctype]
 
 class AllMimeRender :: forall k. k -> Type -> Constraint
@@ -126,17 +158,17 @@ instance allMimeAltNoContent :: (AllMime ctypes) => AllMimeRender ctypes NoConte
         where 
             pxys = Proxy :: Proxy ctypes  
 
-else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accepts ctype, MimeRender ctype a) => AllMimeRender (ctype :<|> ctypes) a where 
+else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accept ctype, MimeRender ctype a) => AllMimeRender (ctype :<|> ctypes) a where 
     allMimeRender _ x = Array.cons (Tuple (contentType pxy) (mimeRender pxy x)) $ allMimeRender pxys x
         where 
             pxy  = Proxy :: Proxy ctype 
             pxys = Proxy :: Proxy ctypes  
 
-else instance allMimeRender' :: (Accepts ctype, MimeRender ctype a) => AllMimeRender ctype a where  --- base case  type class 
+else instance allMimeRender' :: (Accept ctype, MimeRender ctype a) => AllMimeRender ctype a where  --- base case  type class 
     allMimeRender pxy x = [ Tuple (contentType pxy) (mimeRender pxy x) ]
 
 class MimeUnrender :: forall k. k -> Type -> Constraint
-class Accepts ctype <= MimeUnrender ctype a where
+class Accept ctype <= MimeUnrender ctype a where
     mimeUnrender :: Proxy ctype -> String -> Either String a    
 
 instance mimeUnrenderWithStatusJson :: MimeUnrender JSON a => MimeUnrender JSON (WithStatus status a) where  
@@ -157,7 +189,7 @@ class (AllMime list) <= AllMimeUnrender list a where
 
 instance allMimeUnrenderAlt :: 
   ( MimeUnrender ctyp a
-  , Accepts ctyps
+  , Accept ctyps
   , AllMimeUnrender ctyps a
   ) => AllMimeUnrender (ctyp :<|> ctyps) a where
   allMimeUnrender _ =
@@ -169,7 +201,7 @@ instance allMimeUnrenderAlt ::
 
 else instance allMimeUnrender' :: 
   ( MimeUnrender ctyp a
-  , Accepts ctyp
+  , Accept ctyp
   ) => AllMimeUnrender ctyp a where
   allMimeUnrender _ = map mk (NE.toArray $ contentTypes pctyp) 
     where
