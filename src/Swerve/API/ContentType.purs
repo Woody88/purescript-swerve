@@ -32,6 +32,9 @@ data NoContent = NoContent
 
 newtype AcceptHeader = AcceptHeader String 
 
+instance writeForeignNoContent :: WriteForeign NoContent where 
+    writeImpl _ = Json.undefined
+
 derive instance eqAcceptHeader :: Eq AcceptHeader
 
 class Accepts :: forall k. k -> Constraint
@@ -89,6 +92,9 @@ instance mimeRenderWithStatusText :: MimeRender PlainText a => MimeRender PlainT
 
 instance mimeRenderPlainTextString :: MimeRender PlainText String where 
     mimeRender _ = identity
+
+instance mimeRenderPlainTextNoContent :: MimeRender PlainText NoContent where 
+    mimeRender _ = mempty
 
 instance mimeRenderPlainTextRecord :: WriteForeign (Record r) => MimeRender PlainText (Record r) where 
     mimeRender _ = Json.writeJSON

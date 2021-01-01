@@ -19,19 +19,19 @@ foreign import data Ok' :: Status
 foreign import data Forbidden' :: Status
 foreign import data BadRequest' :: Status
 
-class HasStatus' a where 
+class HasStatus' a label | a -> label where 
   statusOf :: Proxy a -> H.Status 
 
-instance hasStatusNoContent' :: HasStatus' NoContent' where 
+instance hasStatusNoContent' :: HasStatus' NoContent' "204" where 
   statusOf _ = H.noContent204
 
-instance hasStatusOk' :: HasStatus' Ok' where 
+instance hasStatusOk' :: HasStatus' Ok' "200" where 
   statusOf _ = H.ok200
 
-instance hasStatusBadRequest' :: HasStatus' BadRequest' where 
+instance hasStatusBadRequest' :: HasStatus' BadRequest' "400" where 
   statusOf _ = H.badRequest400
 
-instance hasStatusWithStatus :: HasStatus' status => HasStatus' (WithStatus status a) where 
+instance hasStatusWithStatus :: HasStatus' status label => HasStatus' (WithStatus status a) label where 
   statusOf _ = statusOf (Proxy :: _ status)
 
 data WithStatus (k :: Status) a = WithStatus (Proxy k) a

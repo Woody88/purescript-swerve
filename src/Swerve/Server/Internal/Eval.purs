@@ -1,5 +1,6 @@
 module Swerve.Server.Internal.Eval where 
 
+import Data.Variant
 import Data.Either
 import Data.Maybe 
 import Data.Symbol
@@ -54,7 +55,7 @@ instance evalServerVerb
   :: EvalServer (ServerT (Verb method a status hdrs ctypes) m) (m a)
 
 instance evalServerSVerb 
-  :: EvalServer (ServerT (SVerb method ctypes as) m) (m as)
+  :: EvalServer (ServerT (SVerb method ctypes as) m) (m (Variant as))
 
 instance evalServerRaw 
   :: TypeEquals Application waiApp 
@@ -120,7 +121,7 @@ instance evalDelayedVerb
 
 instance evalDelayedSVerb
   :: EvalDelayed (Delayed env (ServerT (SVerb method ctype as) m)) 
-                 (Delayed env (m as))
+                 (Delayed env (m (Variant as)))
 
 instance evalDelayedRaw
   :: TypeEquals Application waiApp 
@@ -177,7 +178,7 @@ instance evalHandlerRaise ::
 
 instance evalHandlerVerb :: EvalHandler (Verb method a status hdrs ct) (m (Response rs a))
 
-instance evalHandlerSVerb :: EvalHandler (SVerb method ctypes as) (m as)
+instance evalHandlerSVerb :: EvalHandler (SVerb method ctypes as) (m (Variant as))
 
 instance evalHandlerRaw 
   :: TypeEquals Application waiApp 

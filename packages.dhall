@@ -126,6 +126,10 @@ let overrides =
       , simple-json = upstream.simple-json // { version = "ps-0.14" }
       , typelevel-prelude = upstream.typelevel-prelude // { version = "master" }
       , type-equality = upstream.type-equality // { version = "master" }
+      , heterogeneous = 
+            upstream.heterogeneous // { repo = "https://github.com/Woody88/purescript-heterogeneous.git"
+                                , version = "polykindsUpdate"
+                                }
       , variant = 
             upstream.variant // { repo = "https://github.com/Woody88/purescript-variant.git"
                                 , version = "polykindsUpdate"

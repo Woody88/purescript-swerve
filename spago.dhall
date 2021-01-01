@@ -10,11 +10,12 @@ You can edit this file as you like.
   , "debugged"
   , "effect"
   , "form-urlencoded"
+  , "heterogeneous"
   , "http-media"
   , "http-types"
+  , "node-http"
   , "psci-support"
   , "simple-json"
-  , "node-http"
   , "wai"
   , "warp"
   ]

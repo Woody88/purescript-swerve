@@ -27,4 +27,5 @@ data Raise (st :: Status) (hdrs :: Headers) (ct :: ContentType)
 data ReqBody (a :: Type) (ct :: ContentType) 
 data Raw
 
-data SVerb (m :: Method') (cts :: ContentType) (as :: Type)
+data SVerb :: forall k. Method' -> ContentType -> k -> Type
+data SVerb (m :: Method') (cts :: ContentType) as 

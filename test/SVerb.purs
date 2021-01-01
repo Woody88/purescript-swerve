@@ -1,24 +1,44 @@
 module Test.SVerb where
 
-import Prelude 
+import Prelude hiding (Void)
 
-import Effect.Aff
+import Effect 
+import Effect.Class (liftEffect)
+import Effect.Aff 
+import Effect.Aff as Aff
+import Data.Debug.Eval as D
+import Data.Symbol
 import Data.Either.Inject (inj)
 import Data.Either.Nested (type  (\/))
+import Data.Maybe 
+import Data.Variant 
+import Data.Variant as V
+import Data.Newtype (wrap, unwrap)
+import Data.Tuple 
+import Network.HTTP.Types 
 import Network.Wai as Wai
-import Swerve.API (type (:>), GET', JSON, SVerb, WithStatus(..), Ok', NoContent)
+import Swerve.API (type (:>), GET', JSON, SVerb,Capture,  WithStatus(..))
+import Swerve.API.ContentType 
+import Swerve.API.Status (class HasStatus', Ok', BadRequest')
 import Swerve.API.SVerb
 import Swerve.Server
 import Swerve.Server (lift) as Server
+import Test.Stream (newStream)
 import Type.Proxy
+import Type.Row (type (+))
+
+
+type Handler r = Aff (Variant r)
 
 type LoginAPI
   = "login"
-  :> SVerb GET' JSON (Ok String \/ Void)
+  :> Capture Int 
+  :> SVerb GET' JSON (Ok String + BadRequest + Void)
 
-
-login :: Aff (Ok String \/ Void)
-login = pure $ inj $ WithStatus (Proxy :: _ Ok') "Hello, World!"
+login :: Int -> Handler (Ok String + BadRequest + Void)
+login = pure <<< case _ of 
+  13 -> V.inj (SProxy :: _ "400") $ WithStatus (Proxy :: _ BadRequest') mempty
+  _  -> V.inj (SProxy :: _ "200") $ WithStatus (Proxy :: _ Ok') "Hello, World!"
 
 loginAPI :: Server LoginAPI 
 loginAPI = Server.lift login 
@@ -26,15 +46,15 @@ loginAPI = Server.lift login
 app :: Wai.Application
 app = serve (Proxy :: _ LoginAPI) loginAPI
 
--- main :: Effect Unit
--- main = Aff.launchAff_ do 
---   stream <- liftEffect $ newStream "Hello, World!"
---   app (request stream) responseFn
---   where 
---     request s = wrap $ _ { body = Just s,  pathInfo = [ "users", "13" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
---     responseFn (Wai.ResponseString status headers message) = do 
---       liftEffect $ D.eval { status, headers, message }
---     responseFn _ = liftEffect $ D.eval "bad response"
+main :: Effect Unit
+main = Aff.launchAff_ do 
+  stream <- liftEffect $ newStream "Hello, World!"
+  app (request stream) responseFn
+  where 
+    request s = wrap $ _ { body = Just s,  pathInfo = [ "login", "13" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
+    responseFn (Wai.ResponseString status headers message) = do 
+      liftEffect $ D.eval { status, headers, message }
+    responseFn _ = liftEffect $ D.eval "bad response"
 
 -- login = pure $ case 1 of 
 --   1 -> inj $ WithStatus (Proxy :: _ Ok') "Hello, World!"

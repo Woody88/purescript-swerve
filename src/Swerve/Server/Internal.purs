@@ -2,18 +2,23 @@ module Swerve.Server.Internal where
 
 import Prelude
 
+import Data.Variant
+import Data.Variant as V
 import Data.Array ((:))
 import Data.Either (Either(..), either)
 import Data.Either.Inject 
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (wrap)
+import Data.Newtype (class Newtype, wrap, unwrap)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Aff.Class (liftAff)
 import Effect.Ref as Ref
+import Heterogeneous.Folding (class Folding, class FoldlVariant, class HFoldl, ConstFolding, hfoldl)
+import Network.HTTP.Types as H
 import Network.HTTP.Types (Method, hAccept, hContentType)
 import Network.HTTP.Types.Method (methodGet, methodHead)
 import Network.Wai (Request(..), Application, responseStr)
@@ -24,12 +29,12 @@ import Record as Record
 import Swerve.API.Auth (AuthProtect)
 import Swerve.API.BasicAuth (BasicAuth)
 import Swerve.API.Capture (class ReadCapture, readCapture)
-import Swerve.API.ContentType (class Accepts, class AllCTRender, class AllCTUnrender, class AllMime, AcceptHeader(..), handleAcceptH, canHandleAcceptH, canHandleCTypeH)
+import Swerve.API.ContentType (class MimeRender, class Accepts, class AllCTRender, class AllCTUnrender, class AllMime, AcceptHeader(..), handleAcceptH, canHandleAcceptH, canHandleCTypeH)
 import Swerve.API.Header (class ReadHeader, readHeader)
 import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.QueryParam (class ReadQuery, readQuery)
 import Swerve.API.Status (class HasStatus, class HasStatus', statusOf)
-import Swerve.API.Types (type (:<|>), type (:>), Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', SVerb, Verb, (:<|>))
+import Swerve.API.Types (type (:<|>), type (:>), ContentType, Capture, Header, QueryParam, Raise, Raw, ReqBody, Respond', SVerb, Verb, (:<|>))
 import Swerve.Server.Internal.Auth (AuthHandler, unAuthHandler)
 import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
 import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
@@ -43,6 +48,7 @@ import Type.Equality (class TypeEquals)
 import Type.Equality as TypeEquals 
 import Type.Proxy (Proxy(..))
 import Type.Row as Row
+import Type.RowList (class RowToList, RowList)
 import Unsafe.Coerce
 
 -- data Server' (api :: Type)  (m :: Type -> Type) 
@@ -73,12 +79,35 @@ instance hasServerAlt ::
       pa = Proxy :: _ a 
       pb = Proxy :: _ b 
 
-instance hasServerSVerb :: 
-  ( HasStatus' a
-  , ToMethod method
-  , Accepts ctypes
+data EncodeResponse (ctypes :: ContentType) = EncodeResponse AcceptHeader
+
+newtype EncodedResponse = EncodedResponse (Tuple H.Status (Maybe (Tuple String String)))
+
+derive instance newtypeEncodedResponse :: Newtype EncodedResponse _
+
+instance foldingEncodeResponse ::
+  ( HasStatus' a label
   , AllCTRender ctypes a
-  , Inject a as 
+  ) => Folding (EncodeResponse ctypes) EncodedResponse a EncodedResponse where
+  folding (EncodeResponse accH) _ a = EncodedResponse $ (statusOf (Proxy :: _ a)) /\ (handleAcceptH ctypesP accH a)
+    where 
+      ctypesP = Proxy :: _ ctypes 
+
+encodeResponse :: forall r rl ctypes. 
+  HFoldl (EncodeResponse ctypes) EncodedResponse (Variant r) EncodedResponse
+  => FoldlVariant (ConstFolding (EncodeResponse ctypes)) EncodedResponse rl r EncodedResponse
+  => RowToList r rl
+  => Variant r 
+  -> Proxy ctypes
+  -> AcceptHeader
+  -> EncodedResponse
+encodeResponse v p accH = hfoldl ((EncodeResponse accH) :: EncodeResponse ctypes) (EncodedResponse (H.status500 /\ Nothing)) v
+
+instance hasServerSVerb :: 
+  ( ToMethod method
+  , Accepts ctypes 
+  , FoldlVariant (ConstFolding (EncodeResponse ctypes)) EncodedResponse rl as EncodedResponse
+  , RowToList as rl
   ) => HasServer (SVerb method ctypes as) context m where 
   hoistServerWithContext _ _ nt server = lift $ nt $ eval server
   route _ _ _ subserver = leafRouter route'
@@ -91,15 +120,12 @@ instance hasServerSVerb ::
           action = (evalD subserver) `addMethodCheck` methodCheck method request
                                        `addAcceptCheck` acceptCheck ctypesP accH
         runAction action env request respond 
-          \(v :: as) -> case prj v of 
-              Nothing -> FailFatal err500   -- is this right? 
-              Just (s :: a) -> case handleAcceptH ctypesP accH s of 
-                Nothing -> FailFatal err406 
-                Just (ct /\ body) -> 
-                  let bdy     = if allowedMethodHead method request then "" else body
-                      headers = [(hContentType /\ ct)]  -- :  s.headers   <-- need to handle headers later
-                      status  = statusOf (Proxy :: _ a)   
-                  in Route $ responseStr status headers bdy
+          \(out :: Variant as) -> case unwrap $ encodeResponse out ctypesP accH of 
+            _ /\ Nothing -> FailFatal err406 
+            status /\ Just (ct /\ body) -> let 
+              bdy     = if allowedMethodHead method request then "" else body
+              headers = [(hContentType /\ ct)]  -- :  s.headers   <-- need to handle headers later
+              in Route $ responseStr status headers bdy
 
 instance hasServerVerb :: 
   ( HasStatus status label
