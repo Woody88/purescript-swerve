@@ -35,8 +35,8 @@ type LoginAPI
 
 login :: Int -> Handler (Ok String + BadRequest + Void)
 login = pure <<< case _ of 
-  13 -> V.inj (SProxy :: _ "400") $ WithStatus (Proxy :: _ BadRequest') mempty
-  _  -> V.inj (SProxy :: _ "200") $ WithStatus (Proxy :: _ Ok') "Hello, World!"
+  13 -> respond (Proxy :: _ BadRequest') mempty
+  _  -> respond (Proxy :: _ Ok') "Hello, World!"
 
 loginAPI :: Server LoginAPI 
 loginAPI = Server.lift login 
