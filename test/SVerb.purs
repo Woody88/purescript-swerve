@@ -17,16 +17,12 @@ import Data.Newtype (wrap, unwrap)
 import Data.Tuple 
 import Network.HTTP.Types 
 import Network.Wai as Wai
-
 import Swerve.API 
 import Swerve.Server
 import Swerve.Server (lift) as Server
 import Test.Stream (newStream)
 import Type.Proxy
 import Type.Row (type (+))
-
-
-type Handler r = Aff (Variant r)
 
 type LoginAPI
   = "login"
