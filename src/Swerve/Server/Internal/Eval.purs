@@ -96,11 +96,6 @@ instance evalDelayedSVerb
   :: EvalDelayed (Delayed env (ServerT (Verb method ctype as) m)) 
                  (Delayed env (m (Variant as)))
 
--- instance evalDelayedRaw
---   :: TypeEquals Application waiApp 
---   => EvalDelayed (Delayed env (ServerT Raw m)) 
---                  (Delayed env waiApp)
-
 instance evalDelayedRaw
   :: TypeEquals Application waiApp 
   => EvalDelayed (Delayed env (ServerT Raw m)) 
@@ -150,12 +145,12 @@ instance evalHandlerRaw
   => EvalHandler Raw (m waiApp)
 
 instance evalHandlerBasicAuth
-  :: EvalHandler (ServerT api m) server 
-  => EvalHandler (ServerT (BasicAuth realm usr :> api) m) (usr -> server)
+  :: EvalHandler api server 
+  => EvalHandler (BasicAuth realm usr :> api) (usr -> server)
 
 instance evalHandlerAuth 
-  :: EvalHandler (ServerT api m) server 
-  => EvalHandler (ServerT (AuthProtect tag :> api) m) (a -> server)
+  :: EvalHandler api server 
+  => EvalHandler (AuthProtect tag :> api) (a -> server)
 
 evalD :: forall a b. EvalDelayed a b => a -> b
 evalD = unsafeCoerce

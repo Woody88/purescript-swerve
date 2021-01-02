@@ -2,12 +2,12 @@ module Swerve.Server.Internal.Handler where
 
 import Prelude 
 
-import Data.Variant (Variant)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
+import Swerve.Server.Internal.Response (ResponseV)
 
-type Handler a = HandlerM (Variant a)
+type Handler a = HandlerM (ResponseV a)
 newtype HandlerM a = Handler (Aff a)      
 
 derive instance functorHandler :: Functor HandlerM 

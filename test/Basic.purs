@@ -1,35 +1,28 @@
-module Test.SVerb where
+module Test.Basic where
 
-import Prelude hiding (Void)
+import Prelude 
 
-import Effect 
+import Effect (Effect)
 import Effect.Class (liftEffect)
-import Effect.Aff 
 import Effect.Aff as Aff
 import Data.Debug.Eval as D
-import Data.Symbol
-import Data.Either.Inject (inj)
-import Data.Either.Nested (type  (\/))
-import Data.Maybe 
-import Data.Variant 
-import Data.Variant as V
+import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap, unwrap)
-import Data.Tuple 
-import Network.HTTP.Types 
+import Data.Tuple (Tuple(..))
+import Network.HTTP.Types (hAuthorization, hContentType)
 import Network.Wai as Wai
 import Swerve.API 
 import Swerve.Server
 import Swerve.Server (lift) as Server
 import Test.Stream (newStream)
-import Type.Proxy
-import Type.Row (type (+))
+import Type.Proxy (Proxy(..))
 
 type LoginAPI
   = "login"
   :> Capture "id" Int 
-  :> Get JSON (Ok String + BadRequest + Void)
+  :> Get JSON (Ok String + BadRequest + Nil)
 
-login :: Int -> Handler (Ok String + BadRequest + Void)
+login :: Int -> Handler (Ok String + BadRequest + Nil)
 login = pure <<< case _ of 
   13 -> respond (Proxy :: _ BadRequest') mempty
   _  -> respond (Proxy :: _ Ok') "Hello, World!"
@@ -49,7 +42,3 @@ main = Aff.launchAff_ do
     responseFn (Wai.ResponseString status headers message) = do 
       liftEffect $ D.eval { status, headers, message }
     responseFn _ = liftEffect $ D.eval "bad response"
-
--- login = pure $ case 1 of 
---   1 -> inj $ WithStatus (Proxy :: _ Ok') "Hello, World!"
---   _ -> inj $ WithStatus BadRequest NoContent

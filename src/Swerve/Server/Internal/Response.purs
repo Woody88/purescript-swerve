@@ -8,6 +8,9 @@ import Swerve.API.Status (class HasStatus, WithStatus(..))
 import Type.Row (class Cons)
 import Type.Proxy (Proxy)
 
+type ResponseV a = Variant a 
+type Nil = () 
+ 
 respond :: forall a r r' status label. 
   IsSymbol label
   => HasStatus status label 

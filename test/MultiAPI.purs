@@ -1,78 +1,77 @@
 module Test.MultiAPI where
 
--- import Prelude
+import Prelude
 
--- import Data.Debug.Eval as D
--- import Data.Maybe (Maybe(..))
--- import Data.Newtype (unwrap, wrap)
--- import Data.Tuple (Tuple(..))
--- import Effect (Effect)
--- import Effect.Aff (Aff)
--- import Effect.Aff as Aff
--- import Effect.Class (liftEffect)
--- import Effect.Class.Console as Console
--- import Network.HTTP.Types (hAuthorization, hContentType, ok200)
--- import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
--- import Swerve.API
--- import Swerve.API (type (:<|>), type (:>), BadRequest, Capture, Get, Header, JSON, NotFound, Ok, PlainText, QueryParam, Raise, Raw, ReqBody, _BadRequest, _NotFound, _Ok, (:<|>))
--- import Swerve.Server (Response, raise, respond, serve)
--- import Swerve.Server (Server, ServerT)
--- import Swerve.Server (eval, lift) as Server
--- import Test.Stream (newStream)
--- import Type.Proxy (Proxy(..))
+import Data.Debug.Eval as D
+import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap, wrap)
+import Data.Tuple (Tuple(..))
+import Effect (Effect)
+import Effect.Aff (Aff)
+import Effect.Aff as Aff
+import Effect.Class (liftEffect)
+import Effect.Class.Console as Console
+import Network.HTTP.Types (hAuthorization, hContentType, ok200)
+import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
+import Swerve.API
+import Swerve.Server
+import Swerve.Server (eval, lift) as Server
+import Test.Stream (newStream)
+import Type.Proxy (Proxy(..))
+import Type.Row (type (+))
 
--- type API = LoginAPI :<|> UserAPI 
+type API = LoginAPI :<|> UserAPI 
 
--- type LoginAPI = Login :<|> Logout 
+type LoginAPI = Login :<|> Logout 
 
--- type Login 
---   = "login" 
---   :> Get String JSON 
+type Login 
+  = "login" 
+  :> Get JSON (Ok String + Nil) 
 
--- type Logout 
---   = "logout" 
---   :> Get String JSON 
+type Logout 
+  = "logout" 
+  :> Get JSON (Ok String + Nil) 
 
--- type UserAPI = User :<|> Users 
+type UserAPI = User :<|> Users 
 
--- type User 
---   = "user" 
---   :> Get String JSON 
+type User 
+  = "user" 
+  :> Get JSON (Ok String + Nil)
 
--- type Users 
---   = "users" 
---   :> Get String JSON 
+type Users 
+  = "users" 
+  :> Get JSON (Ok String + Nil)
 
--- login :: Aff (Response _ String) 
--- login = pure $ respond _Ok "login"
+login :: Handler (Ok String + Nil) 
+login = pure <<< respond (Proxy :: _ Ok') $  "login"
 
--- logout :: Aff (Response _ String) 
--- logout = pure $ raise _BadRequest
+logout :: Handler (Ok String + Nil) 
+logout = pure <<< respond (Proxy :: _ Ok') $  "logout"
 
--- user :: Aff (Response _ String) 
--- user = pure $ respond _Ok "user"
+user :: Handler (Ok String + Nil)
+user = pure <<< respond (Proxy :: _ Ok') $ "user"
 
--- users :: Aff (Response _ String) 
--- users = pure $ respond _Ok "users"
+users :: Handler (Ok String + Nil)
+users = pure <<< respond (Proxy :: _ Ok') $ "users"
 
--- loginAPI :: Server LoginAPI
--- loginAPI = Server.lift (login :<|> logout)
+loginAPI :: Server LoginAPI
+loginAPI = Server.lift (login :<|> logout)
 
--- userAPI :: Server UserAPI 
--- userAPI = Server.lift (user :<|> users)
+userAPI :: Server UserAPI 
+userAPI = Server.lift (user :<|> users)
 
--- server :: Server API
--- server = Server.eval (loginAPI :<|> userAPI)
+server :: Server API
+server = Server.eval (loginAPI :<|> userAPI)
 
--- app :: Wai.Application
--- app = serve (Proxy :: _ API) server
+app :: Wai.Application
+app = serve (Proxy :: _ API) server
 
--- main :: Effect Unit
--- main = Aff.launchAff_ do 
---   stream <- liftEffect $ newStream "Hello, World!"
---   app (request stream) responseFn
---   where 
---     request s = wrap $ _ { body = Just s,  pathInfo = [ "login" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
---     responseFn (Wai.ResponseString status headers message) = do 
---       liftEffect $ D.eval { status, headers, message }
---     responseFn _ = liftEffect $ D.eval "bad response"
+main :: Effect Unit
+main = Aff.launchAff_ do 
+  stream <- liftEffect $ newStream "Hello, World!"
+  app (request stream) responseFn
+  where 
+    request s = wrap $ _ { body = Just s,  pathInfo = [ "user" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
+    responseFn (Wai.ResponseString status headers message) = do 
+      liftEffect $ D.eval { status, headers, message }
+    responseFn _ = liftEffect $ D.eval "bad response"

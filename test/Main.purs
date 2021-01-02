@@ -1,6 +1,6 @@
 module Test.Main where
 
-import Prelude hiding (Void)
+import Prelude
 
 import Data.Debug.Eval as D
 import Data.Maybe (Maybe(..))
@@ -17,7 +17,6 @@ import Swerve.Server
 import Swerve.Server (lift) as Server
 import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
-import Type.Row (type (+))
 
 type User = String
 type UserId = Int  
@@ -32,7 +31,7 @@ type GetUser
   :> QueryParam "maxAge" MaxAge 
   :> Header "authorization" Authorization 
   :> ReqBody PlainText String  
-  :> Get JSON (Ok User + BadRequest + NotFound + Void)
+  :> Get JSON (Ok User + BadRequest + NotFound + Nil)
 
 type GetRaw = "raw" :> Raw 
 
@@ -41,7 +40,7 @@ getUser
   -> Maybe MaxAge 
   -> Authorization 
   -> String 
-  -> Handler (Ok User + BadRequest + NotFound + Void)
+  -> Handler (Ok User + BadRequest + NotFound + Nil)
 getUser userId _ _ body = case userId of 
   13        -> pure <<< respond (Proxy :: _ BadRequest') $ "Invalid User Id"
   17        -> pure <<< respond (Proxy :: _ NotFound') $ mempty
