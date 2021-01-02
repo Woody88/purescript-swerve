@@ -33,7 +33,8 @@ import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.QueryParam (class ReadQuery, QueryParam, readQuery )
 import Swerve.API.Raw (Raw)
 import Swerve.API.ReqBody  (ReqBody)
-import Swerve.API.Status (class HasStatus, statusOf)
+import Swerve.API.Status (class HasStatus)
+import Swerve.API.Status.KnownStatus (statusVal)
 import Swerve.API.Sub (type (:>))
 import Swerve.API.Types (ContentType')
 import Swerve.API.Verb (Verb)
@@ -41,7 +42,6 @@ import Swerve.Server.Internal.Auth (AuthHandler, unAuthHandler)
 import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
 import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
-import Swerve.Server.Internal.Handler (runHandler)
 import Swerve.Server.Internal.Eval (Server, ServerT, lift, eval, evalD)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter)
@@ -76,10 +76,10 @@ newtype EncodedResponse = EncodedResponse (Tuple H.Status (Maybe (Tuple String S
 derive instance newtypeEncodedResponse :: Newtype EncodedResponse _
 
 instance foldingEncodeResponse ::
-  ( HasStatus a label
+  ( HasStatus a status
   , AllCTRender ctypes a
   ) => Folding (EncodeResponse ctypes) EncodedResponse a EncodedResponse where
-  folding (EncodeResponse accH) _ a = EncodedResponse $ (statusOf (Proxy :: _ a)) /\ (handleAcceptH ctypesP accH a)
+  folding (EncodeResponse accH) _ a = EncodedResponse $ (statusVal (Proxy :: _ status)) /\ (handleAcceptH ctypesP accH a)
     where 
       ctypesP = Proxy :: _ ctypes 
 

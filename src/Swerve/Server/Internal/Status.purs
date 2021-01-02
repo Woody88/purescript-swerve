@@ -1,6 +1,7 @@
 module Swerve.Server.Status where
   
-import Swerve.API.Status (WithStatus, Ok', BadRequest', NotFound')
+import Swerve.API.Status.Types 
+import Swerve.API.Status (WithStatus)
 
 type Void :: forall k. Row k
 type Void = ()
