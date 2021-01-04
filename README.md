@@ -110,58 +110,59 @@ For more examples please refer to the test folder.
 ```purescript 
 import Prelude
 
+import Data.Debug.Eval as D
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Network.HTTP.Types (hAuthorization, hContentType, ok200)
 import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
-import Swerve.API (type (:<|>), type (:>), BadRequest, Capture, Get, Header, JSON, NotFound, Ok, PlainText, QueryParam, Raise, Raw, ReqBody, _BadRequest, _NotFound, _Ok, (:<|>))
-import Swerve.Server (class HasResp, Response, Server, raise, respond, serve)
-import Swerve.Server (from) as Server
+import Swerve.API
+import Swerve.Server 
+import Swerve.Server (lift) as Server
+import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 
 type User = String
 type UserId = Int  
 type MaxAge = Int 
+type Authorization = String 
 
 type API = GetUser :<|> GetRaw 
 
 type GetUser 
   = "users" 
-  :> Capture UserId 
+  :> Capture "userId" UserId 
   :> QueryParam "maxAge" MaxAge 
-  :> ReqBody String PlainText
-  :> Raise NotFound () JSON
-  :> Get User JSON 
+  :> Header "authorization" Authorization 
+  :> ReqBody PlainText String  
+  :> Get JSON (Ok User + BadRequest + NotFound + Nil)
 
 type GetRaw = "raw" :> Raw 
 
-getUser :: forall rs
-  .  HasResp Ok () rs
-  => HasResp BadRequest () rs
-  => HasResp NotFound () rs
-  => UserId 
+getUser 
+  :: UserId 
   -> Maybe MaxAge 
+  -> Authorization 
   -> String 
-  -> Aff (Response rs User) 
+  -> Handler (Ok User + BadRequest + NotFound + Nil)
 getUser userId _ _ body = case userId of 
-  17        -> pure $ raise _NotFound
+  13        -> pure <<< respond (Proxy :: _ BadRequest') $ "Invalid User Id"
+  17        -> pure <<< respond (Proxy :: _ NotFound') $ mempty
   otherwise -> do
     Console.log $ "Body: " <> body
-    pure $ respond _Ok "User1"
+    pure <<< respond (Proxy :: _ Ok') $ "User" <> show userId
 
-getRaw :: Aff Application
+getRaw :: HandlerM Wai.Application
 getRaw = pure $ \req send -> send $ Wai.responseStr ok200 [] "Raw!"
 
 server :: Server API
-server = Server.from (getUser :<|> getRaw)
+server = Server.lift (getUser :<|> getRaw)
 
-app :: Application
+app :: Wai.Application
 app = serve (Proxy :: _ API) server
 
 main :: Effect Unit
