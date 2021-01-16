@@ -57,7 +57,7 @@ instance runClientClientM :: RunClient ClientM' where
   throwClientError = throwError
   runRequest (Request req) = do 
     baseUrl <- ask
-    let url  = String.joinWith "/" [baseUrl, req.url]
+    let url  = baseUrl <> req.url
         hdrs = map (\(Tuple ck v) -> RequestHeader (unwrap ck) v) req.headers
         method = Method.fromString $ show req.method 
 
