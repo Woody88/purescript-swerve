@@ -4,9 +4,11 @@ You can edit this file as you like.
 -}
 { name = "purescript-swerve"
 , dependencies =
-  [ "arrays"
+  [ "affjax"
+  , "arrays"
   , "b64"
   , "console"
+  , "debug"
   , "debugged"
   , "effect"
   , "form-urlencoded"

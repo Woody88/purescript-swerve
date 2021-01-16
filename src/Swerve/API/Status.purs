@@ -1,5 +1,9 @@
 module Swerve.API.Status where
 
+import Data.Debug
+import Data.Debug as D
+import Data.Generic.Rep
+import Data.Symbol
 import Swerve.API.Status.KnownStatus (class KnownStatus)
 import Swerve.API.Status.Types 
 import Swerve.API.Types (Status')
@@ -7,8 +11,13 @@ import Type.Proxy (Proxy)
 
 data WithStatus (k :: Status') a = WithStatus (Proxy k) a
 
+instance debugWithStatus :: (IsSymbol status, HasStatus k status, Debug a) => Debug (WithStatus k a) where
+  debug (WithStatus _ a) = D.constructor "WithStatus" [debug status, debug a]
+    where 
+      status = reflectSymbol (SProxy :: _ status)
+
 class HasStatus :: forall k. k -> Symbol -> Constraint
-class KnownStatus statusNat <= HasStatus a statusNat | a -> statusNat  
+class KnownStatus statusNat <= HasStatus a statusNat | a -> statusNat
 
 instance hasStatusWithStatus :: HasStatus status statusNat => HasStatus (WithStatus status a) statusNat 
 instance hasStatusContinue                       :: HasStatus Continue' "100" 

@@ -1,7 +1,7 @@
 module Swerve.Client.Internal.RunClient where
 
 import Prelude
-
+import Data.Variant (Variant)
 import Network.Wai (Request, Response)
 
 class Monad m <= RunClient m where

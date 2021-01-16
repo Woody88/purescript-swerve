@@ -52,7 +52,7 @@ import Network.HTTP.Media as Media
 import Prim.TypeError as TE
 import Simple.JSON (class WriteForeign)
 import Simple.JSON as Json
-import Swerve.API.Alternative (type (:<|>))
+import Swerve.API.Alternative (type (:))
 import Swerve.API.Status (WithStatus(..))
 import Swerve.API.Types (ContentType')
 import Type.Proxy (Proxy(..))
@@ -140,7 +140,7 @@ class AllMime :: forall k. k -> Constraint
 class AllMime ctypes where 
     allMime :: Proxy ctypes -> Array MediaType 
 
-instance allMimeAlt :: (AllMime ctypes, Accept ctype, Accept ctypes)  => AllMime (ctype :<|> ctypes) where 
+instance allMimeAlt :: (AllMime ctypes, Accept ctype, Accept ctypes)  => AllMime (ctype : ctypes) where 
     allMime _ =  Array.cons (contentType pctype) $ allMime pctypes
         where 
             pctype  = Proxy :: Proxy ctype 
@@ -159,7 +159,7 @@ instance allMimeAltNoContent :: (AllMime ctypes) => AllMimeRender ctypes NoConte
         where 
             pxys = Proxy :: Proxy ctypes  
 
-else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accept ctype, MimeRender ctype a) => AllMimeRender (ctype :<|> ctypes) a where 
+else instance allMimeRenderAlt :: (AllMimeRender ctypes a, Accept ctype, MimeRender ctype a) => AllMimeRender (ctype : ctypes) a where 
     allMimeRender _ x = Array.cons (Tuple (contentType pxy) (mimeRender pxy x)) $ allMimeRender pxys x
         where 
             pxy  = Proxy :: Proxy ctype 
@@ -192,7 +192,7 @@ instance allMimeUnrenderAlt ::
   ( MimeUnrender ctyp a
   , Accept ctyps
   , AllMimeUnrender ctyps a
-  ) => AllMimeUnrender (ctyp :<|> ctyps) a where
+  ) => AllMimeUnrender (ctyp : ctyps) a where
   allMimeUnrender _ =
     map mk (NE.toArray $ contentTypes pctyp) <> allMimeUnrender pctyps
     where
