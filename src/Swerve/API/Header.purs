@@ -1,9 +1,20 @@
 module Swerve.API.Header where
 
+import Prelude 
+
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
 
 data Header (s :: Symbol) (a :: Type)
+
+class ToHeader a where 
+  toHeader :: a -> String 
+
+instance toHeaderString :: ToHeader String where 
+  toHeader a = a 
+
+instance toHeaderInt :: ToHeader Int where 
+  toHeader = show
 
 class ReadHeader a where 
   readHeader :: String -> Maybe a 

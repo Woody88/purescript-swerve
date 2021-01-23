@@ -1,9 +1,20 @@
 module Swerve.API.QueryParam where
 
+import Prelude 
+
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
 
 data QueryParam (s :: Symbol) (a :: Type)
+
+class ToQueryParam a where 
+  toQueryParam :: a -> String 
+
+instance toQueryParamString :: ToQueryParam String where 
+  toQueryParam a = a 
+
+instance toQueryParamInt :: ToQueryParam Int where 
+  toQueryParam = show
 
 class ReadQuery a where 
   readQuery :: String -> Maybe a 
