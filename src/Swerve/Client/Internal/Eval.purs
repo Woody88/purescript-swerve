@@ -5,6 +5,7 @@ import Data.Variant (Variant)
 import Network.HTTP.Types.Method as H
 import Network.Wai (Application)
 import Swerve.API.Alternative (type (:<|>))
+import Swerve.API.Auth
 import Swerve.API.BasicAuth
 import Swerve.API.Capture
 import Swerve.API.Header
@@ -13,6 +14,7 @@ import Swerve.API.Raw
 import Swerve.API.ReqBody
 import Swerve.API.Sub 
 import Swerve.API.Verb (Verb)
+import Swerve.Client.Internal.Auth (AuthenticatedRequest)
 import Type.Equality (class TypeEquals)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -33,6 +35,8 @@ instance _evalClientQueryParam :: EvalClient (Client m (QueryParam name a :> api
 instance _evalClientReqBody :: EvalClient (Client m (ReqBody ctypes a :> api)) (a -> Client m api)
 
 instance _evalClientBasicAuth :: EvalClient (Client m (BasicAuth realm usr :> api)) (BasicAuthData -> Client m api)
+
+instance _evalClientAuth :: EvalClient (Client m (AuthProtect tag :> api)) (AuthenticatedRequest a -> Client m api)
 
 instance _evalClientRaw :: EvalClient (Client m Raw) (H.StdMethod -> Client m api)
 
@@ -61,6 +65,10 @@ instance evalHandlerReqBody
 instance evalHandlerBasicAuth
   :: EvalHandler api server 
   => EvalHandler (BasicAuth realm usr :> api) (BasicAuthData -> server)
+
+instance evalHandlerAuth
+  :: EvalHandler api server 
+  => EvalHandler (AuthProtect tag :> api) (AuthenticatedRequest a -> server)
 
 instance evalHandlerRaw 
   :: TypeEquals Application waiApp 
