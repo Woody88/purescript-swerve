@@ -3,7 +3,7 @@ module Swerve.Client.Internal.Eval where
 import Data.Symbol
 import Data.Variant (Variant)
 import Network.HTTP.Types.Method as H
-import Network.Wai (Application)
+import Network.Wai (Application, Response)
 import Swerve.API.Alternative (type (:<|>))
 import Swerve.API.Auth
 import Swerve.API.BasicAuth
@@ -38,7 +38,7 @@ instance _evalClientBasicAuth :: EvalClient (Client m (BasicAuth realm usr :> ap
 
 instance _evalClientAuth :: EvalClient (Client m (AuthProtect tag :> api)) (AuthenticatedRequest a -> Client m api)
 
-instance _evalClientRaw :: EvalClient (Client m Raw) (H.StdMethod -> Client m api)
+instance _evalClientRaw :: EvalClient (Client m Raw) (H.StdMethod -> m Response)
 
 instance _evalClientPath 
   :: IsSymbol path 
