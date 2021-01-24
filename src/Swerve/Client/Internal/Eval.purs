@@ -3,7 +3,7 @@ module Swerve.Client.Internal.Eval where
 import Data.Symbol
 import Data.Variant (Variant)
 import Network.HTTP.Types.Method as H
-import Network.Wai (Application, Response)
+import Network.Wai (Application)
 import Swerve.API.Alternative (type (:<|>))
 import Swerve.API.Auth
 import Swerve.API.BasicAuth
@@ -15,6 +15,7 @@ import Swerve.API.ReqBody
 import Swerve.API.Sub 
 import Swerve.API.Verb (Verb)
 import Swerve.Client.Internal.Auth (AuthenticatedRequest)
+import Swerve.Client.Internal.Response 
 import Type.Equality (class TypeEquals)
 import Unsafe.Coerce (unsafeCoerce)
 

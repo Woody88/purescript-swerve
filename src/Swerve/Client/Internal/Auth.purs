@@ -2,7 +2,7 @@ module Swerve.Client.Internal.Auth where
 
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
-import Network.Wai.Internal (Request)
+import Swerve.Client.Internal.Request 
 
 newtype AuthenticatedRequest a = AuthenticatedRequest (Tuple a (a -> Request -> Request))
 

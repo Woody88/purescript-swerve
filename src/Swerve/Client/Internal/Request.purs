@@ -7,7 +7,7 @@ import Network.HTTP.Types.Method as H
 import Network.HTTP.Media 
 
 type RequestRow body path = 
-  ( path        :: path
+  ( url        :: path
   , queryString :: H.Query
   , body        :: Maybe (body /\ MediaType)
   , accept      :: Array MediaType
@@ -22,7 +22,7 @@ data RequestBody = RequestBodyStr String
 
 defaultRequest :: Request
 defaultRequest = 
-  { path: ""
+  { url: ""
   , queryString: []
   , body: Nothing
   , accept: []
