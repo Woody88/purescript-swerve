@@ -2,10 +2,10 @@ module Swerve.Client.Internal where
 
 import Prelude 
 
-import Network.Wai (defaultRequest)
 import Swerve.Client.ClientM (ClientM')
 import Swerve.Client.Internal.Eval (class EvalHandler, Client)
 import Swerve.Client.Internal.HasClient (class HasClient, clientWithRoute)
+import Swerve.Client.Internal.Request (defaultRequest)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 

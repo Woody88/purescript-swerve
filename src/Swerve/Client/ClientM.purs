@@ -5,6 +5,7 @@ import Prelude
 import Affjax as AX
 import Affjax.RequestBody as RequestBody
 import Affjax.RequestHeader (RequestHeader(..))
+import Affjax.ResponseHeader (ResponseHeader(..))
 import Affjax.ResponseFormat as ResponseFormat
 import Control.Alt (class Alt)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
@@ -13,10 +14,11 @@ import Control.Monad.Reader (class MonadAsk, class MonadReader, ReaderT, ask, ru
 import Data.Either (Either(..))
 import Data.HTTP.Method (fromString)
 import Data.HTTP.Method as Method
-import Data.Newtype (unwrap)
+import Data.Newtype (wrap, unwrap)
 import Data.String as String
 import Data.Traversable (for)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
+import Data.Tuple.Nested ((/\))
 import Data.Variant
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
@@ -24,11 +26,11 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect)
 import Effect.Class.Console as Console
 import Effect.Ref as Ref
-import Network.Wai (Request(..), responseStr)
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
 import Swerve.Client.Internal.RunClient (class RunClient, throwClientError)
+import Swerve.Client.Internal.Request
 
 -- These two type synonyms will eventually change 
 type BaseUrl = String
@@ -55,24 +57,20 @@ runClientM (ClientM cm) baseUrl = runExceptT $ flip runReaderT baseUrl $ cm
 
 instance runClientClientM :: RunClient ClientM' where 
   throwClientError = throwError
-  runRequest (Request req) = do 
+  runRequest req = do 
     baseUrl <- ask
-    let url  = baseUrl <> req.url
-        hdrs = map (\(Tuple ck v) -> RequestHeader (unwrap ck) v) req.headers
-        method = Method.fromString $ show req.method 
+    let url     = baseUrl <> req.url
+    let hdrs    = map (\(Tuple ck v) -> RequestHeader (unwrap ck) v) req.headers
+    let method  = Method.fromString $ show req.method 
+    let content = (RequestBody.string <<< convertBody <<< fst) <$> req.body
 
-    bodyStr <- liftAff $ for req.body \stream ->   
-      Aff.makeAff \done -> do
-        bufs <- Ref.new []
-        Stream.onData stream \buf ->
-          void $ Ref.modify (_ <> [buf]) bufs
-        Stream.onEnd stream do
-          body <- Ref.read bufs >>= Buffer.concat >>= Buffer.toString UTF8
-          done $ Right body
-        pure Aff.nonCanceler
-
-    let content = RequestBody.string <$> bodyStr 
     result <- liftAff $ AX.request $ AX.defaultRequest { method = method, url = url, responseFormat = ResponseFormat.string, headers = hdrs, content = content }
     case result of 
       Left e -> throwClientError $ AX.printError e
-      Right resp -> pure $ responseStr { code: unwrap resp.status, message: resp.statusText } [] resp.body
+      Right res -> do 
+        let status  = { code: unwrap res.status, message: res.statusText }
+        let headers = map (\(ResponseHeader n v) ->  wrap n /\ v) res.headers 
+        pure $ { status, headers, body: res.body, httpVersion: req.httpVersion }
+
+    where   
+      convertBody (RequestBodyStr str) = str
