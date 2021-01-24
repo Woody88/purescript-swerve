@@ -1,6 +1,6 @@
 let conf = ./spago.dhall
 
-let dependencies = [ "psci-support", "spec" ]
+let dependencies = [ "psci-support", "spec", "partial" ]
 
 let sources = [ "test/**/*.purs" ]
 
