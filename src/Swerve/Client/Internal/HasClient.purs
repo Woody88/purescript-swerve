@@ -1,6 +1,7 @@
 module Swerve.Client.Internal.HasClient where
 
 import Prelude 
+import Data.Array.NonEmpty as NE
 import Data.Either 
 import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap)
@@ -11,10 +12,11 @@ import Effect
 import Node.Stream 
 import Swerve.API.Alternative (type (:<|>), (:<|>))
 import Swerve.API.Capture 
-import Swerve.API.ContentType (class MimeUnrender, mimeUnrender)
+import Swerve.API.ContentType (class MimeRender, class MimeUnrender, mimeRender, mimeUnrender, contentTypes)
 import Swerve.API.Header 
 import Swerve.API.QueryParam 
 import Swerve.API.Sub 
+import Swerve.API.ReqBody
 import Swerve.API.Raw 
 import Swerve.API.Verb (Verb)
 import Swerve.Client.Internal.Eval (Client, lift)
@@ -86,17 +88,14 @@ instance _hasClientQueryParam ::
       let queryString' = [ qname /\ (Just $ toQueryParam val) ] <> req.queryString
       clientWithRoute pm (Proxy :: _ api) req { queryString = queryString' }
 
--- instance _hasClientReqBody :: 
---   ( IsSymbol name 
---   , MimeRender ct a
---   , HasClient m api 
---   ) => HasClient m (ReqBody ct a :> api) where 
---   clientWithRoute pm _ (Request req) = 
---     lift $ \body -> do 
---       let body' = mimeRender (Proxy :: _ ct) body
-           
---       let queryString' = [ qname /\ (Just $ toQueryParam val) ] <> req.queryString
---       clientWithRoute pm (Proxy :: _ api) $ Request req { queryString = queryString' }
-
-
-foreign import toReadableStream :: String -> Effect (Readable ())
+instance _hasClientReqBody :: 
+  ( IsSymbol name 
+  , MimeRender ct a
+  , HasClient m api 
+  ) => HasClient m (ReqBody ct a :> api) where 
+  clientWithRoute pm _ req = 
+    lift $ \body -> do 
+      let ctypesP   = (Proxy :: _ ct)
+      let body'     = mimeRender ctypesP body
+      let mediaType = NE.head $ contentTypes ctypesP
+      clientWithRoute pm (Proxy :: _ api) req { body = Just (RequestBodyStr body' /\ mediaType)  }
