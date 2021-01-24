@@ -61,7 +61,7 @@ instance runClientClientM :: RunClient ClientM' where
     baseUrl <- ask
     let url     = baseUrl <> req.url
     let hdrs    = map (\(Tuple ck v) -> RequestHeader (unwrap ck) v) req.headers
-    let method  = Method.fromString $ show req.method 
+    let method  = Method.fromString req.method 
     let content = (RequestBody.string <<< convertBody <<< fst) <$> req.body
 
     result <- liftAff $ AX.request $ AX.defaultRequest { method = method, url = url, responseFormat = ResponseFormat.string, headers = hdrs, content = content }
