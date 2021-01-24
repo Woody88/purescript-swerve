@@ -11,6 +11,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Network.HTTP.Types (hAuthorization, ok200, unauthorized401)
 import Network.Wai as Wai
+import Network.Wai.Internal
 import Partial.Unsafe (unsafePartial)
 import Simple.JSON (writeJSON)
 import Swerve.API.BasicAuth (BasicAuthData(..))
@@ -29,7 +30,7 @@ spec = describe "basic-auth" do
   it "decode's basic authorization header" do
     let request = wrap $ _ { headers = [Tuple hAuthorization "Basic aGVsbG86d29ybGQ="]  } $ unwrap Wai.defaultRequest
         basicAuthData = Just $ BasicAuthData {username: "hello", password: "world"} 
-    (decodeBAHeader request) `shouldEqual` basicAuthData
+    (decodeBAHeader request) `shouldEqual` basicAuthData 
 
   it "decode's encoded basic authorization header" do
     let 
@@ -44,10 +45,10 @@ spec = describe "basic-auth" do
   it "should unauthorize" do 
     let 
       request = wrap $ _ { pathInfo = [ "mysite" ], headers = [Tuple hAuthorization "Basic aGVsbG86d29ybGQ="] } $ unwrap Wai.defaultRequest
-      responseFn (Wai.ResponseString status headers message) = status `shouldEqual` unauthorized401
-      responseFn _ = fail "fail"
+      responseFn (Wai.ResponseString status headers message) = (status `shouldEqual` unauthorized401) *> pure ResponseReceived
+      responseFn _ = fail "fail" *> pure ResponseReceived
 
-    TBA.app request responseFn
+    void $ TBA.app request responseFn
 
   it "should authorize and return user website" do 
     let 
@@ -58,6 +59,7 @@ spec = describe "basic-auth" do
       responseFn (Wai.ResponseString status headers message) = do
         status `shouldEqual` ok200
         message `shouldEqual` (writeJSON website)
-      responseFn _ = fail "fail"
+        pure ResponseReceived
+      responseFn _ = fail "fail" *> pure ResponseReceived
 
-    TBA.app request responseFn
+    void $ TBA.app request responseFn

@@ -11,6 +11,7 @@ import Data.Newtype (wrap, unwrap)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Types (hAuthorization, hContentType)
 import Network.Wai as Wai
+import Network.Wai.Internal
 import Swerve.API 
 import Swerve.Server
 import Swerve.Server (lift) as Server
@@ -41,4 +42,5 @@ main = Aff.launchAff_ do
     request s = wrap $ _ { body = Just s,  pathInfo = [ "login", "13" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
     responseFn (Wai.ResponseString status headers message) = do 
       liftEffect $ D.eval { status, headers, message }
-    responseFn _ = liftEffect $ D.eval "bad response"
+      pure ResponseReceived
+    responseFn _ = (liftEffect $ D.eval "bad response") *> pure ResponseReceived

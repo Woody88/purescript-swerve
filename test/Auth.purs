@@ -9,6 +9,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Network.HTTP.Types (ok200, forbidden403)
 import Network.Wai as Wai
+import Network.Wai.Internal
 import Partial.Unsafe (unsafePartial)
 import Test.Auth.Example as TA
 import Test.Spec (Spec, describe, it)
@@ -26,17 +27,17 @@ spec = describe "generalized-auth" do
   it "should unauthorize" do 
     let 
       request = wrap $ _ { pathInfo = [ "private", "secret" ] } $ unwrap Wai.defaultRequest
-      responseFn (Wai.ResponseString status headers message) = status `shouldEqual` forbidden403
-      responseFn _ = fail "fail"
+      responseFn (Wai.ResponseString status headers message) = (status `shouldEqual` forbidden403) *> pure ResponseReceived
+      responseFn _ = fail "fail" *> pure ResponseReceived
 
-    TA.app request responseFn
+    void $ TA.app request responseFn
 
   it "should authorize private endpoint and return user website" do 
     let 
       accKey =  fst $ unsafePartial $ ArrayP.head TA.users 
       cookie = "swerve-auth-cookie" <> "=" <> accKey
       request = wrap $ _ { pathInfo = [ "private", "secret" ], headers = [ Tuple (wrap "Cookie") cookie ] } $ unwrap Wai.defaultRequest
-      responseFn (Wai.ResponseString status headers message) = status `shouldEqual` ok200
-      responseFn _ = fail "fail"
+      responseFn (Wai.ResponseString status headers message) = (status `shouldEqual` ok200) *> pure ResponseReceived
+      responseFn _ = fail "fail" *> pure ResponseReceived
 
-    TA.app request responseFn
+    void $ TA.app request responseFn
