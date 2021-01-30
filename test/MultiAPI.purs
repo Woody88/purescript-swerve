@@ -16,14 +16,20 @@ import Network.Wai (Application, Response(..), defaultRequest, responseStr) as W
 import Network.Wai.Internal
 import Swerve.API
 import Swerve.Server
-import Swerve.Server (eval, lift) as Server
+import Swerve.Server (compose, lift) as Server
 import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 import Type.Row (type (+))
 
-type API = LoginAPI :<|> UserAPI 
+type API = Record 
+  ( loginAPI :: LoginAPI 
+  , userAPI  :: UserAPI 
+  )
 
-type LoginAPI = Login :<|> Logout 
+type LoginAPI = Record 
+  ( login  :: Login
+  , logout :: Logout 
+  )
 
 type Login 
   = "login" 
@@ -33,7 +39,10 @@ type Logout
   = "logout" 
   :> Get JSON (Ok String + Nil) 
 
-type UserAPI = User :<|> Users 
+type UserAPI = Record
+  ( user  :: User
+  , users :: Users
+  ) 
 
 type User 
   = "user" 
@@ -56,13 +65,13 @@ users :: Handler (Ok String + Nil)
 users = pure <<< respond (Proxy :: _ Ok') $ "users"
 
 loginAPI :: Server LoginAPI
-loginAPI = Server.lift (login :<|> logout)
+loginAPI = Server.lift { login, logout }
 
 userAPI :: Server UserAPI 
-userAPI = Server.lift (user :<|> users)
+userAPI = Server.lift { user, users }
 
 server :: Server API
-server = Server.eval (loginAPI :<|> userAPI)
+server = Server.compose { loginAPI,  userAPI }
 
 app :: Wai.Application
 app = serve (Proxy :: _ API) server
