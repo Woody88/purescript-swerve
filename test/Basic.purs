@@ -18,10 +18,11 @@ import Swerve.Server (lift) as Server
 import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 
-type LoginAPI
-  = "login"
-  :> Capture "id" Int 
-  :> Get JSON (Ok String + BadRequest + Nil)
+type LoginAPI = Record 
+  ( login :: "login"
+             :> Capture "id" Int 
+             :> Get JSON (Ok String + BadRequest + Nil)
+  )
 
 login :: Int -> Handler (Ok String + BadRequest + Nil)
 login = pure <<< case _ of 
@@ -29,7 +30,7 @@ login = pure <<< case _ of
   _  -> respond (Proxy :: _ Ok') "Hello, World!"
 
 loginAPI :: Server LoginAPI 
-loginAPI = Server.lift login 
+loginAPI = Server.lift { login }
 
 app :: Wai.Application
 app = serve (Proxy :: _ LoginAPI) loginAPI
