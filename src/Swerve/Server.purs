@@ -18,7 +18,7 @@ import Prelude
 
 import Effect.Aff (Aff)
 import Network.Wai (Application) 
-import Swerve.Server.Internal.Eval (class EvalCompose, class EvalHandler, Regular, Compose, Server, ServerT)
+import Swerve.Server.Internal.Eval (class EvalHandler, Regular, Compose, Server, ServerT)
 import Swerve.Server.Internal.Eval (Server, ServerT, eval) as ServerType
 import Swerve.Server.Internal (class HasServer, hoistServerWithContext, route)
 import Swerve.Server.Internal.Auth (AuthHandler(..), mkAuthHandler, unAuthHandler) as Auth

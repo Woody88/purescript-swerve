@@ -126,14 +126,32 @@ instance evalRoutesNil' :: EvalRoutes Regular RL.Nil RL.Nil
 instance evalRoutesNil :: EvalRoutes Compose RL.Nil RL.Nil 
 
 instance evalRoutesConst' :: 
-  ( EvalHandler Regular a a'
-  , EvalRoutes Compose rest rest'
-  ) => EvalRoutes Compose (RL.Cons name (ServerT a m) rest) (RL.Cons name a' rest') 
+  ( EvalRoutes Compose rest rest'
+  , EvalCompose a a'
+  ) => EvalRoutes Compose (RL.Cons name a rest) (RL.Cons name (ServerT a' m) rest') 
 
 instance evalRoutesConst :: 
   ( EvalHandler Regular a a'
   , EvalRoutes Regular rest rest'
   ) => EvalRoutes Regular (RL.Cons name a rest) (RL.Cons name a' rest') 
+
+
+class EvalCompose a b | a -> b
+
+instance evalComposeRec :: EvalCompose (Record a) (Record a)
+
+instance evalComposePath :: 
+  ( IsSymbol path 
+  , EvalCompose api server
+  ) => EvalCompose (path :> api) stri
+
+instance evalComposeBasicAuth
+  :: EvalCompose api server 
+  => EvalCompose (BasicAuth realm usr :> api) (usr -> server)
+
+instance evalComposeAuth 
+  :: EvalCompose api server 
+  => EvalCompose (AuthProtect tag :> api) (a -> server)
 
 -- Handler Eval
 class EvalHandler m (a :: Type) (b :: Type) | a -> b
