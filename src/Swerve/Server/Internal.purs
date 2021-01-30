@@ -49,18 +49,21 @@ import Swerve.Server.Internal.RouteResult (RouteResult(..))
 import Swerve.Server.Internal.Router (Router, Router'(..), choice, leafRouter, pathRouter)
 import Swerve.Server.Internal.ServerError (ServerError, err400, err405, err406, err415, err500)
 import Type.Proxy (Proxy(..))
-import Type.Row as Row
+import Type.Row (class Cons) as Row
 import Type.RowList (class RowToList)
-import Unsafe.Coerce 
+import Unsafe.Coerce (unsafeCoerce)
+import Record.Unsafe (unsafeGet, unsafeSet) as Record 
 
 class HasServer api context m | api -> context m where 
   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (m ~> n) -> ServerT api m -> ServerT api n
 
 class ToServer rl api context m | rl -> context m where
+  hoistServerWithContext' :: forall n. Proxy rl -> Proxy context -> (m ~> n) -> ServerT api m -> ServerT api n
   toServer :: forall env. Proxy rl -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
 
-instance toServerNil :: ToServer RL.Nil api context m where 
+instance toServerNil :: ToServer RL.Nil (Record routes) context m where 
+  hoistServerWithContext' _ pc nt s = unsafeCoerce s
   toServer _ _ _ _ = StaticRouter mempty mempty
 
 instance toServerCons :: 
@@ -69,20 +72,28 @@ instance toServerCons ::
   , ToServer rest (Record routes) context m 
   , Row.Cons name api r routes 
   ) => ToServer (RL.Cons name api rest) (Record routes) context m where 
+  hoistServerWithContext' _ pc nt s = let 
+    -- Is there a safer solution ?
+    (s' :: ServerT api m) = Record.unsafeGet nameP (unsafeCoerce s)
+    in unsafeCoerce $ Record.unsafeSet nameP (hoistServerWithContext api pc nt s') (unsafeCoerce s)
+    where 
+      api = Proxy :: _ api 
+      nameP = reflectSymbol (SProxy :: _ name)
+
   toServer _ m ctx server = 
     choice 
-      (route api m ctx ((\(r :: {|routes} ) -> unsafeCoerce $ Record.get nameP r) <$> evalD server))
+      (route api m ctx $ modifyServer (evalD server) nameP)
       (toServer rest m ctx server)
     where 
       api   = Proxy :: _ api 
       rest  = Proxy :: _ rest
-      nameP = SProxy :: _ name 
+      nameP = Proxy :: _ name 
 
 instance hasServerRoutes :: 
   ( RL.RowToList routes rl 
   , ToServer rl (Record routes) context m 
   ) => HasServer (Record routes) context m where 
-  hoistServerWithContext _ _ _ _ = unsafeCoerce "" 
+  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext' (Proxy :: _ rl) pc nt s
   route _ m ctx server = toServer (Proxy :: _ rl) m ctx server 
 
 instance hasServerAlt :: 

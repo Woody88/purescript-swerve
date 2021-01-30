@@ -22,25 +22,25 @@ import Type.Proxy (Proxy(..))
 
 type ReaderApp a = ReaderAppM (ResponseV a)
 type ReaderAppM = Reader String 
-type ReaderAPI = Test :<|> GetRaw 
-
-type GetRaw = "raw" :> Raw
-type Test = "test" :> Get JSON (Ok String + Nil)
+type ReaderAPI = Record 
+  ( test :: "test" :> Get JSON (Ok String + Nil)
+  -- , raw  :: "raw" :> Raw
+  )
 
 readerApi = Proxy :: Proxy ReaderAPI
 
-getInt :: ReaderApp (Ok String + Nil)
-getInt = do 
+test :: ReaderApp (Ok String + Nil)
+test = do 
   v <- ask 
   pure <<< respond (Proxy :: _ Ok') $ v
 
-getRaw :: ReaderAppM Wai.Application
-getRaw = do 
+raw :: ReaderAppM Wai.Application
+raw = do 
   v <- ask
   pure \req send -> send $ Wai.responseStr ok200 [] v
 
 readerServer :: ServerT ReaderAPI ReaderAppM
-readerServer = Server.lift (getInt :<|> getRaw) 
+readerServer = Server.lift { test } 
 
 -- | Natural Transformer. Transforms our ReadAppM to a swerve HandlerM.
 nt :: ReaderAppM ~> HandlerM

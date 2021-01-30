@@ -19,7 +19,8 @@ import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Delayed (Delayed)
 import Swerve.Server.Internal.Handler (HandlerM)
 import Type.Equality (class TypeEquals)
-import  Type.RowList (class RowToList, class ListToRow)
+import Type.RowList (class RowToList, class ListToRow)
+import Type.Proxy (Proxy)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Server type to be used as an associated type.
@@ -28,6 +29,8 @@ data ServerT (api :: Type) (m :: Type -> Type)
 
 -- Server Eval 
 class EvalServer (a :: Type) (b :: Type) | a -> b
+
+instance evalServerRec :: EvalServer (ServerT (Record routes) m) (ServerT (Record routes) m)
 
 instance evalServerAlt :: EvalServer (ServerT (a :<|> b) m) ((ServerT a m) :<|> (ServerT b m))
 
@@ -68,6 +71,11 @@ instance evalServerAuth
 
 -- Delayed Eval 
 class EvalDelayed (a :: Type) (b :: Type) | a -> b
+
+
+instance evalConsDelayed 
+  ::  EvalDelayed (Delayed env (ServerT (Proxy rl) m))
+                 (Delayed env (Record row))
 
 instance evalRoutesDelayed 
   :: EvalDelayed (Delayed env (ServerT (Record routes) m))
