@@ -6,12 +6,15 @@ import Control.Monad.Reader (ask)
 import Data.Function (applyFlipped)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested (type (/\), (/\))
+import Data.Symbol (class IsSymbol, SProxy(..))
 import Effect.Aff (Aff)
 import Network.Wai (Request, Response)
-
+import Prim.Row as Row 
+import Record as Record 
 import Swerve.Server.Internal.DelayedIO (DelayedIO, liftRouteResult, runDelayedIO)
 import Swerve.Server.Internal.Handler
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
+import Type.Proxy (Proxy)
 import Unsafe.Coerce (unsafeCoerce)
 
 data Delayed :: forall k. k -> Type -> Type
@@ -65,6 +68,14 @@ emptyDelayed result =
     }
   where
     r = pure unit
+
+modifyServer :: forall a b r name env. IsSymbol name => Row.Cons name b r a => Delayed env { | a } -> Proxy name -> Delayed env b
+modifyServer delayed _ = do 
+  let delayed' = Record.get (SProxy :: _ name) <$> delayed 
+  delayed'
+    # unDelayed \d@{ server } -> 
+        mkDelayed d { server = \c p h a b req -> server c p h a b req
+                    }
 
 addCapture :: forall a b captured env. Delayed env (a -> b) -> (captured -> DelayedIO a) -> Delayed (captured /\ env) b
 addCapture delayed new = 

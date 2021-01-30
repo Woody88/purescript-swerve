@@ -22,6 +22,8 @@ import Network.Wai (Request(..), responseStr)
 import Node.Buffer as Buffer
 import Node.Encoding (Encoding(..))
 import Node.Stream as Stream
+import Prim.RowList as RL
+import Prim.Row as Row
 import Record as Record
 import Swerve.API.Alternative (type (:<|>), (:<|>))
 import Swerve.API.Auth (AuthProtect)
@@ -40,7 +42,7 @@ import Swerve.API.Types (ContentType')
 import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Auth (AuthHandler, unAuthHandler)
 import Swerve.Server.Internal.BasicAuth (BasicAuthCheck, runBasicAuth)
-import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, runAction, runDelayed)
+import Swerve.Server.Internal.Delayed (Delayed, addAuthCheck, addAcceptCheck, addBodyCheck, addCapture, addHeaderCheck, addMethodCheck, addParameterCheck, modifyServer, runAction, runDelayed)
 import Swerve.Server.Internal.DelayedIO (DelayedIO, delayedFail, delayedFailFatal, withRequest)
 import Swerve.Server.Internal.Eval (Server, ServerT, lift, eval, evalD)
 import Swerve.Server.Internal.RouteResult (RouteResult(..))
@@ -49,10 +51,39 @@ import Swerve.Server.Internal.ServerError (ServerError, err400, err405, err406, 
 import Type.Proxy (Proxy(..))
 import Type.Row as Row
 import Type.RowList (class RowToList)
+import Unsafe.Coerce 
 
 class HasServer api context m | api -> context m where 
   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (m ~> n) -> ServerT api m -> ServerT api n
+
+class ToServer rl api context m | rl -> context m where
+  toServer :: forall env. Proxy rl -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
+
+instance toServerNil :: ToServer RL.Nil api context m where 
+  toServer _ _ _ _ = StaticRouter mempty mempty
+
+instance toServerCons :: 
+  ( IsSymbol name 
+  , HasServer api context m 
+  , ToServer rest (Record routes) context m 
+  , Row.Cons name api r routes 
+  ) => ToServer (RL.Cons name api rest) (Record routes) context m where 
+  toServer _ m ctx server = 
+    choice 
+      (route api m ctx ((\(r :: {|routes} ) -> unsafeCoerce $ Record.get nameP r) <$> evalD server))
+      (toServer rest m ctx server)
+    where 
+      api   = Proxy :: _ api 
+      rest  = Proxy :: _ rest
+      nameP = SProxy :: _ name 
+
+instance hasServerRoutes :: 
+  ( RL.RowToList routes rl 
+  , ToServer rl (Record routes) context m 
+  ) => HasServer (Record routes) context m where 
+  hoistServerWithContext _ _ _ _ = unsafeCoerce "" 
+  route _ m ctx server = toServer (Proxy :: _ rl) m ctx server 
 
 instance hasServerAlt :: 
   ( HasServer a context m

@@ -4,6 +4,8 @@ import Data.Maybe (Maybe)
 import Data.Symbol (class IsSymbol)
 import Data.Variant (Variant)
 import Network.Wai (Application)
+import Prim.Row as Row 
+import Prim.RowList as RL
 import Swerve.API.Alternative (type (:<|>))
 import Swerve.API.Auth (AuthProtect)
 import Swerve.API.BasicAuth (BasicAuth)
@@ -17,6 +19,7 @@ import Swerve.API.Verb (Verb)
 import Swerve.Server.Internal.Delayed (Delayed)
 import Swerve.Server.Internal.Handler (HandlerM)
 import Type.Equality (class TypeEquals)
+import  Type.RowList (class RowToList, class ListToRow)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- Server type to be used as an associated type.
@@ -66,6 +69,10 @@ instance evalServerAuth
 -- Delayed Eval 
 class EvalDelayed (a :: Type) (b :: Type) | a -> b
 
+instance evalRoutesDelayed 
+  :: EvalDelayed (Delayed env (ServerT (Record routes) m))
+                 (Delayed env (Record routes))
+
 instance evalAltDelayed 
   :: EvalDelayed (Delayed env (ServerT (a :<|> b) m))  
                  (Delayed env (ServerT a m :<|> ServerT b m)) 
@@ -109,48 +116,81 @@ instance evalDelayedAuth
   :: EvalDelayed (Delayed env (ServerT (AuthProtect tag :> api) m)) 
                  (Delayed env (a -> ServerT api m))
 
--- Handler Eval
-class EvalHandler (a :: Type) (b :: Type) | a -> b
+data Regular 
+data Compose 
 
-instance evalAltHandlers' :: 
-  ( EvalHandler a a'
-  , EvalHandler  b b'
-  ) => EvalHandler (a :<|> b) (a' :<|> b')
+class EvalRoutes m a b | a -> b
+
+instance evalRoutesNil' :: EvalRoutes Regular RL.Nil RL.Nil 
+
+instance evalRoutesNil :: EvalRoutes Compose RL.Nil RL.Nil 
+
+instance evalRoutesConst' :: 
+  ( EvalHandler Regular a a'
+  , EvalRoutes Compose rest rest'
+  ) => EvalRoutes Compose (RL.Cons name (ServerT a m) rest) (RL.Cons name a' rest') 
+
+instance evalRoutesConst :: 
+  ( EvalHandler Regular a a'
+  , EvalRoutes Regular rest rest'
+  ) => EvalRoutes Regular (RL.Cons name a rest) (RL.Cons name a' rest') 
+
+-- Handler Eval
+class EvalHandler m (a :: Type) (b :: Type) | a -> b
+
+instance evalRoutesHandlers :: 
+  ( RowToList routes rl 
+  , EvalRoutes Regular rl rl'  
+  , ListToRow rl' routes'
+  ) => EvalHandler Regular (Record routes) (Record routes')
+
+instance evalRoutesHandlers' :: 
+  ( RowToList routes rl 
+  , EvalRoutes Compose rl rl'  
+  , ListToRow rl' routes'
+  ) => EvalHandler Compose (Record routes) (Record routes')
+
+instance evalAltHandlers :: 
+  ( EvalHandler Regular a a' 
+  ,  EvalHandler Regular b b' 
+  ) => EvalHandler Regular (a :<|> b) (a' :<|>  b')
+
+instance evalAltHandlers' :: EvalHandler Compose (a :<|> b) (ServerT a m :<|>  ServerT b m)
 
 instance evalHandlerPath :: 
   ( IsSymbol path 
-  , EvalHandler api server
-  ) => EvalHandler (path :> api) server
+  , EvalHandler m api server
+  ) => EvalHandler m (path :> api) server
 
 instance evalHandlerReqBody 
-  :: EvalHandler api server 
-  => EvalHandler (ReqBody ctypes a :> api) (a -> server)
+  :: EvalHandler m api server 
+  => EvalHandler m (ReqBody ctypes a :> api) (a -> server)
 
 instance evalHandlerCapture
-  :: EvalHandler api server 
-  => EvalHandler (Capture sym a :> api) (a -> server)
+  :: EvalHandler m api server 
+  => EvalHandler m (Capture sym a :> api) (a -> server)
 
 instance evalHandlerHeader
-  :: EvalHandler api server 
-  => EvalHandler (Header sym a :> api) (a -> server)
+  :: EvalHandler m api server 
+  => EvalHandler m (Header sym a :> api) (a -> server)
 
 instance evalHandlerQueryParam
-  :: EvalHandler api server 
-  => EvalHandler (QueryParam sym a :> api) (Maybe a -> server)
+  :: EvalHandler m api server 
+  => EvalHandler m (QueryParam sym a :> api) (Maybe a -> server)
 
-instance evalHandlerSVerb :: EvalHandler (Verb method ctypes as) (m (Variant as))
+instance evalHandlerSVerb :: EvalHandler n (Verb method ctypes as) (m (Variant as))
 
 instance evalHandlerRaw 
   :: TypeEquals Application waiApp 
-  => EvalHandler Raw (m waiApp)
+  => EvalHandler n Raw (m waiApp)
 
 instance evalHandlerBasicAuth
-  :: EvalHandler api server 
-  => EvalHandler (BasicAuth realm usr :> api) (usr -> server)
+  :: EvalHandler m api server 
+  => EvalHandler m (BasicAuth realm usr :> api) (usr -> server)
 
 instance evalHandlerAuth 
-  :: EvalHandler api server 
-  => EvalHandler (AuthProtect tag :> api) (a -> server)
+  :: EvalHandler m api server 
+  => EvalHandler m (AuthProtect tag :> api) (a -> server)
 
 evalD :: forall a b. EvalDelayed a b => a -> b
 evalD = unsafeCoerce

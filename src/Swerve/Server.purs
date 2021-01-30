@@ -11,13 +11,14 @@ module Swerve.Server
   , serveWithContext 
   , hoistServer
   , lift
+  , compose
   ) where
 
 import Prelude 
 
 import Effect.Aff (Aff)
 import Network.Wai (Application) 
-import Swerve.Server.Internal.Eval (class EvalHandler, Server, ServerT)
+import Swerve.Server.Internal.Eval (class EvalCompose, class EvalHandler, Regular, Compose, Server, ServerT)
 import Swerve.Server.Internal.Eval (Server, ServerT, eval) as ServerType
 import Swerve.Server.Internal (class HasServer, hoistServerWithContext, route)
 import Swerve.Server.Internal.Auth (AuthHandler(..), mkAuthHandler, unAuthHandler) as Auth
@@ -52,5 +53,8 @@ hoistServer :: forall api ctx m n.
   -> ServerT api n
 hoistServer p = hoistServerWithContext p (Proxy :: Proxy ctx)
 
-lift :: forall a api m. Monad m => EvalHandler api  a => a -> ServerT api m
+lift :: forall a api m. Monad m => EvalHandler Regular api a => a -> ServerT api m
 lift = unsafeCoerce 
+
+compose :: forall a api m. Monad m => EvalHandler Compose api a => a -> ServerT api m
+compose = unsafeCoerce 
