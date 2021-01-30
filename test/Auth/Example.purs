@@ -41,7 +41,6 @@ lookupAccount key = case Map.lookup key database of
   Nothing -> throwError "Invalid Cookie"
   Just usr -> pure $ usr
 
--- (Either (Respond' Forbidden ()) (Either (Respond' Ok ()) rs))
 authHandler :: AuthHandler Request Account
 authHandler = mkAuthHandler handler
   where
@@ -65,8 +64,10 @@ parseCookies s
   , Just val  <- String.slice (i + 1) (String.length s) s = [Tuple name val]
   | otherwise = []
   
-type AuthGenAPI = "private" :> AuthProtect "cookie-auth" :> PrivateAPI
-             :<|> "public"  :> PublicAPI
+type AuthGenAPI = Record 
+  ( private :: "private" :> AuthProtect "cookie-auth" :> PrivateAPI
+  , public  :: "public"  :> PublicAPI
+  )
 
 type PrivateAPI = "secret" :> Get JSON (Ok String + Nil)
 type PublicAPI  = "data"   :> Get JSON (Ok String + Nil)
@@ -76,13 +77,13 @@ genAuthAPI :: Proxy AuthGenAPI
 genAuthAPI = Proxy
 
 server :: Server AuthGenAPI
-server = Server.lift (privateDataFunc :<|> publicData) 
+server = Server.lift { private, public }
   where 
-    privateDataFunc :: Account -> Handler (Ok String + Nil)
-    privateDataFunc (Account name) = pure <<< respond (Proxy :: _ Ok') $ ("this is a secret: " <> name)
+    private :: Account -> Handler (Ok String + Nil)
+    private (Account name) = pure <<< respond (Proxy :: _ Ok') $ ("this is a secret: " <> name)
     
-    publicData :: Handler (Ok String + Nil)
-    publicData = pure <<< respond (Proxy :: _ Ok') $ "this is a public piece of data"
+    public :: Handler (Ok String + Nil)
+    public = pure <<< respond (Proxy :: _ Ok') $ "this is a public piece of data"
 
 -- Convert our endpoint specification into a Wai Application that can be run by Warp.
 app :: Application

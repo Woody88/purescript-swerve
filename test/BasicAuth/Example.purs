@@ -33,7 +33,9 @@ instance showUser :: Show User where
   show (User u p w) = "(User \"" <> show u <> " \"" <> show p <> " \"" <> show w <> "\"" 
 
 -- Defining API spec and handler 
-type API = BasicAuth "People's websites" User :> "mysite" :> Get JSON (Ok Website + Nil)
+type API = Record 
+  ( site :: BasicAuth "People's websites" User :> "mysite" :> Get JSON (Ok Website + Nil)
+  )
 
 site :: User -> Handler (Ok Website + Nil)
 site = pure <<< respond (Proxy :: _ Ok') <<< website 
@@ -42,7 +44,7 @@ api :: Proxy API
 api = Proxy
 
 server :: Server API
-server = Server.lift site
+server = Server.lift { site }
 
 -- Defining Database 
 type UserDB = Map.Map Username User

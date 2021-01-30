@@ -24,7 +24,7 @@ type UserId = Int
 type MaxAge = Int 
 type Authorization = String 
 
-type API = { userAPI :: UserAPI, testAPI :: "tests" :> TestAPI }
+type API = UserAPI :<|> TestAPI 
 
 type UserAPI = { getUser ::  GetUser, getRaw :: GetRaw } 
 
@@ -72,7 +72,7 @@ testAPI :: Server TestAPI
 testAPI = Server.lift {test1, test2 }
 
 server :: Server API
-server = Server.compose {userAPI, testAPI}
+server = Server.compose (userAPI :<|> testAPI)
 
 app :: Wai.Application
 app = serve (Proxy :: _ API) server
