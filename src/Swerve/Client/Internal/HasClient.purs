@@ -15,6 +15,8 @@ import Prim.RowList as RL
 import Record.Builder (Builder)
 import Record.Builder as Builder
 import Swerve.API.Alternative (type (:<|>), (:<|>))
+import Swerve.API.Auth (AuthProtect)
+import Swerve.API.BasicAuth (BasicAuth)
 import Swerve.API.Capture 
 import Swerve.API.ContentType (class MimeRender, class MimeUnrender, mimeRender, mimeUnrender, contentTypes)
 import Swerve.API.Header 
@@ -23,6 +25,8 @@ import Swerve.API.Sub
 import Swerve.API.ReqBody
 import Swerve.API.Raw 
 import Swerve.API.Verb (Verb)
+import Swerve.Client.Internal.Auth (AuthenticatedRequest(..))
+import Swerve.Client.Internal.BasicAuth (basicAuthReq)
 import Swerve.Client.Internal.Eval (Client, lift)
 import Swerve.Client.Internal.Request
 import Swerve.Client.Internal.Response 
@@ -132,3 +136,19 @@ instance _hasClientReqBody ::
       let body'     = mimeRender ctypesP body
       let mediaType = NE.head $ contentTypes ctypesP
       clientWithRoute pm (Proxy :: _ api) req { body = Just (RequestBodyStr body' /\ mediaType)  }
+
+instance _hasClientBasicAuth :: 
+  ( IsSymbol realm 
+  , HasClient m api 
+  ) => HasClient m (BasicAuth realm usr :> api) where 
+  clientWithRoute pm _ req = 
+    lift $ \val -> 
+      clientWithRoute pm (Proxy :: Proxy api) (basicAuthReq val req)
+
+instance _hasClientAuth :: 
+  ( IsSymbol tag 
+  , HasClient m api 
+  ) => HasClient m (AuthProtect tag :> api) where 
+  clientWithRoute pm _ req = 
+    lift $ \(AuthenticatedRequest (val /\ func)) ->
+      clientWithRoute pm (Proxy :: Proxy api) (func val req)
