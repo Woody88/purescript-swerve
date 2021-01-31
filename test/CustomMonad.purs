@@ -24,7 +24,7 @@ type ReaderApp a = ReaderAppM (ResponseV a)
 type ReaderAppM = Reader String 
 type ReaderAPI = Record 
   ( test :: "test" :> Get JSON (Ok String + Nil)
-  -- , raw  :: "raw" :> Raw
+  , raw  :: "raw" :> Raw
   )
 
 readerApi = Proxy :: Proxy ReaderAPI
@@ -40,7 +40,7 @@ raw = do
   pure \req send -> send $ Wai.responseStr ok200 [] v
 
 readerServer :: ServerT ReaderAPI ReaderAppM
-readerServer = Server.lift { test } 
+readerServer = Server.lift { test, raw } 
 
 -- | Natural Transformer. Transforms our ReadAppM to a swerve HandlerM.
 nt :: ReaderAppM ~> HandlerM
@@ -57,7 +57,7 @@ main = Aff.launchAff_ do
   stream <- liftEffect $ newStream "Hello, World!"
   app (request stream) responseFn
   where 
-    request s = wrap $ _ { body = Just s,  pathInfo = [ "test" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
+    request s = wrap $ _ { body = Just s,  pathInfo = [ "raw" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
     responseFn (Wai.ResponseString status headers message) = do 
       liftEffect $ D.eval { status, headers, message }
       pure ResponseReceived

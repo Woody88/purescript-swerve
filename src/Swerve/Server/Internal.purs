@@ -53,37 +53,39 @@ import Type.Row (class Cons) as Row
 import Type.RowList (class RowToList)
 import Unsafe.Coerce (unsafeCoerce)
 import Record.Unsafe (unsafeGet, unsafeSet) as Record 
-
+import Debug.Trace 
 class HasServer api context m | api -> context m where 
   route :: forall env. Proxy api -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
   hoistServerWithContext :: forall n. Proxy api -> Proxy context -> (m ~> n) -> ServerT api m -> ServerT api n
 
-class ToServer rl api context m | rl -> context m where
-  hoistServerWithContext' :: forall n. Proxy rl -> Proxy context -> (m ~> n) -> ServerT api m -> ServerT api n
-  toServer :: forall env. Proxy rl -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
+class HasServerRow rl api context m | rl -> context m where
+  hoistRowsWithContext :: forall n. Proxy rl -> Proxy context -> (m ~> n) -> ServerT api m -> ServerT api n
+  routeList :: forall env. Proxy rl -> Proxy m -> Record context -> Delayed env (Server api) -> Router env
 
-instance toServerNil :: ToServer RL.Nil (Record routes) context m where 
-  hoistServerWithContext' _ pc nt s = unsafeCoerce s
-  toServer _ _ _ _ = StaticRouter mempty mempty
+instance hasServerRowNil :: HasServerRow RL.Nil (Record routes) context m where 
+  hoistRowsWithContext _ pc nt s = unsafeCoerce s
+  routeList _ _ _ _ = StaticRouter mempty mempty
 
-instance toServerCons :: 
+instance hasServerRowCons :: 
   ( IsSymbol name 
   , HasServer api context m 
-  , ToServer rest (Record routes) context m 
+  , HasServerRow rest (Record routes) context m 
   , Row.Cons name api r routes 
-  ) => ToServer (RL.Cons name api rest) (Record routes) context m where 
-  hoistServerWithContext' _ pc nt s = let 
+  ) => HasServerRow (RL.Cons name api rest) (Record routes) context m where 
+  hoistRowsWithContext _ pc nt s = let 
     -- Is there a safer solution ?
     (s' :: ServerT api m) = Record.unsafeGet nameP (unsafeCoerce s)
-    in unsafeCoerce $ Record.unsafeSet nameP (hoistServerWithContext api pc nt s') (unsafeCoerce s)
+    server = unsafeCoerce $ Record.unsafeSet nameP (hoistServerWithContext api pc nt s') (unsafeCoerce s)
+    in hoistRowsWithContext rest pc nt server 
     where 
-      api = Proxy :: _ api 
+      api   = Proxy :: _ api 
       nameP = reflectSymbol (SProxy :: _ name)
+      rest  = Proxy :: _ rest
 
-  toServer _ m ctx server = 
+  routeList _ m ctx server = 
     choice 
       (route api m ctx $ modifyServer (evalD server) nameP)
-      (toServer rest m ctx server)
+      (routeList rest m ctx server)
     where 
       api   = Proxy :: _ api 
       rest  = Proxy :: _ rest
@@ -91,10 +93,10 @@ instance toServerCons ::
 
 instance hasServerRoutes :: 
   ( RL.RowToList routes rl 
-  , ToServer rl (Record routes) context m 
+  , HasServerRow rl (Record routes) context m 
   ) => HasServer (Record routes) context m where 
-  hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext' (Proxy :: _ rl) pc nt s
-  route _ m ctx server = toServer (Proxy :: _ rl) m ctx server 
+  hoistServerWithContext _ pc nt s = lift $ hoistRowsWithContext (Proxy :: _ rl) pc nt s
+  route _ m ctx server = routeList (Proxy :: _ rl) m ctx server 
 
 instance hasServerAlt :: 
   ( HasServer a context m
