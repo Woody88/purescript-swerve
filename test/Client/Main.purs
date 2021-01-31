@@ -40,9 +40,9 @@ spec = do
   around (withStubbedApi settings apiApp) do
     describe "basic client" do
       it "gets Person" $ \baseUrl -> do
-        let getPerson = client (Proxy :: _ API)
+        let api = client (Proxy :: _ API)
         let getOkResult = V.default (Left "bad status") # V.on (SProxy :: _ "200") (\(WithStatus _ p) -> Right p)
-        eRes <- runClientM getPerson baseUrl
+        eRes <- runClientM api.person baseUrl
 
         (eRes >>= getOkResult) `shouldEqual` (Right jimmy)
 

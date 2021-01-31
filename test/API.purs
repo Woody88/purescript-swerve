@@ -24,16 +24,18 @@ type Person =
   , age  :: Int
   } 
 
-type API = Get JSON (Ok Person + Nil)
+type API = Record 
+  ( person :: Get JSON (Ok Person + Nil)
+  )
 
 jimmy :: Person 
 jimmy = { name: "Jimmy", age: 30 }
 
 server :: Server API 
-server = Server.lift root 
+server = Server.lift { person } 
   where 
-    root :: Handler _
-    root = pure $ respond (Proxy :: _ Ok') jimmy
+    person :: Handler _
+    person = pure $ respond (Proxy :: _ Ok') jimmy
 
 apiApp :: Application
 apiApp = serve (Proxy :: _ API) server
