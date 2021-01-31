@@ -10,6 +10,10 @@ import Data.Tuple.Nested ((/\))
 import Data.Variant (Variant)
 import Effect 
 import Node.Stream 
+import Prim.Row as Row
+import Prim.RowList as RL
+import Record.Builder (Builder)
+import Record.Builder as Builder
 import Swerve.API.Alternative (type (:<|>), (:<|>))
 import Swerve.API.Capture 
 import Swerve.API.ContentType (class MimeRender, class MimeUnrender, mimeRender, mimeUnrender, contentTypes)
@@ -28,6 +32,35 @@ import Type.RowList
 
 class HasClient m api where
   clientWithRoute :: Proxy m -> Proxy api -> Request -> Client m api
+
+class HasClientRow m rl from to | rl -> from to where
+  clientWithRecRoute :: Proxy m -> Proxy rl -> Request -> Builder { | from } { | to } 
+
+instance _hasClientRowNil ::  HasClientRow m RL.Nil to to where 
+  clientWithRecRoute _ _ _ = identity 
+
+instance _hasClientRowCons :: 
+  ( IsSymbol name
+  , HasClient m api 
+  , HasClientRow m rest from' to 
+  , Row.Lacks name from
+  , Row.Cons name (Client m api) from from' 
+  ) => HasClientRow m (RL.Cons name api rest) from to where 
+  clientWithRecRoute m _ req = let 
+    to = clientWithRecRoute m rest req 
+    from = Builder.insert nameP (clientWithRoute m api req)
+    in from >>> to
+
+    where 
+      api   = Proxy :: _ api
+      rest  = Proxy :: _ rest 
+      nameP = SProxy :: _ name  
+
+instance _hasClientRec :: 
+  ( RL.RowToList routes rl 
+  , HasClientRow m rl () routes' 
+  ) => HasClient m (Record routes) where 
+  clientWithRoute m _ req = lift $ flip Builder.build {} $ clientWithRecRoute m (Proxy :: _ rl) req
 
 instance _hasClientAlt :: 
   ( HasClient m a

@@ -4,6 +4,7 @@ import Data.Symbol
 import Data.Variant (Variant)
 import Network.HTTP.Types.Method as H
 import Network.Wai (Application)
+import Prim.RowList as RL
 import Swerve.API.Alternative (type (:<|>))
 import Swerve.API.Auth
 import Swerve.API.BasicAuth
@@ -17,11 +18,14 @@ import Swerve.API.Verb (Verb)
 import Swerve.Client.Internal.Auth (AuthenticatedRequest)
 import Swerve.Client.Internal.Response 
 import Type.Equality (class TypeEquals)
+import Type.RowList (class RowToList, class ListToRow)
 import Unsafe.Coerce (unsafeCoerce)
 
 data Client (m :: Type -> Type) (api :: Type)
 
 class EvalClient (a :: Type) (b :: Type) | a -> b
+
+instance _evalClientRec :: EvalClient (Client m (Record routes)) (Record routes')
 
 instance _evalClientAlt :: EvalClient (Client m (a :<|> b) ) ((Client m a) :<|> (Client m b))
 
@@ -45,7 +49,24 @@ instance _evalClientPath
   :: IsSymbol path 
   => EvalClient (Client m (path :> api)) (Client m api)
 
+
+class EvalRoutes a b | a -> b
+
+instance evalRoutesNil' :: EvalRoutes RL.Nil RL.Nil 
+
+instance evalRoutesConst :: 
+  ( EvalHandler a a'
+  , EvalRoutes rest rest'
+  ) => EvalRoutes (RL.Cons name a rest) (RL.Cons name a' rest') 
+
+
 class EvalHandler (a :: Type) (b :: Type) | a -> b
+
+instance evalRoutesHandlers :: 
+  ( RowToList routes rl 
+  , EvalRoutes rl rl'  
+  , ListToRow rl' routes'
+  ) => EvalHandler (Record routes) (Record routes')
 
 instance evalHandlerCapture
   :: EvalHandler api server 
