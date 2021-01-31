@@ -25,7 +25,14 @@ type Person =
   } 
 
 type API = Record 
-  ( person :: "person" :> PersonAPI
+  ( person  :: "person" :> PersonAPI
+  , private :: PrivateAPI
+  )
+
+type PrivateAPI = Record 
+  ( secret :: "secret" 
+            :> BasicAuth "secret data" String 
+            :> Get JSON (Ok String + Nil)
   )
 
 type PersonAPI = Record 
@@ -41,11 +48,27 @@ person = Server.lift { jim }
     jim :: Handler _
     jim = pure $ respond (Proxy :: _ Ok') jimmy
 
+private :: Server PrivateAPI 
+private = Server.lift { secret } 
+  where 
+    secret :: String -> Handler _
+    secret user = pure $ respond (Proxy :: _ Ok') (user <> " secret")
+
 server :: Server API
-server = Server.compose { person }
+server = Server.compose { person, private }
+
+basicAuth :: BasicAuthCheck String
+basicAuth = BasicAuthCheck $ \(BasicAuthData b) -> do 
+  let woody = "woody"
+  case unit of
+    x | b.username == woody -> 
+          if b.password == "password"
+          then pure (Authorized woody)
+          else pure BadPassword
+    otherwise -> pure NoSuchUser
 
 apiApp :: Application
-apiApp = serve (Proxy :: _ API) server
+apiApp = serveWithContext (Proxy :: _ API) { basicAuth } server
 
 serveStubbedApi :: Settings -> Application -> Aff HTTP.Server
 serveStubbedApi settings app = liftEffect $ runSettings settings app 

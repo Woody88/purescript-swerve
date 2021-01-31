@@ -38,11 +38,18 @@ spec = do
   let settings = defaultSettings { port = 0 }
 
   around (withStubbedApi settings apiApp) do
-    describe "basic client" do
+    let api = client (Proxy :: _ API)
+    describe "client" do
       it "gets Person" $ \baseUrl -> do
-        let api = client (Proxy :: _ API)
         let getOkResult = V.default (Left "bad status") # V.on (SProxy :: _ "200") (\(WithStatus _ p) -> Right p)
         eRes <- runClientM api.person.jim baseUrl
 
         (eRes >>= getOkResult) `shouldEqual` (Right jimmy)
 
+      it "handles basic request" $ \baseUrl -> do
+        let getOkResult = V.default (Left "bad status") # V.on (SProxy :: _ "200") (\(WithStatus _ p) -> Right p)
+        let woody = "woody"
+        let basicAuth = BasicAuthData {username: woody, password: "password" } 
+        eRes <- runClientM (api.private.secret basicAuth) baseUrl
+
+        (eRes >>= getOkResult) `shouldEqual` (Right (woody <> " secret"))
