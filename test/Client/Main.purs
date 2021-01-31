@@ -46,7 +46,7 @@ spec = do
 
         (eRes >>= getOkResult) `shouldEqual` (Right jimmy)
 
-      it "handles basic request" $ \baseUrl -> do
+      it "handles basic auth request" $ \baseUrl -> do
         let getOkResult = V.default (Left "bad status") # V.on (SProxy :: _ "200") (\(WithStatus _ p) -> Right p)
         let woody = "woody"
         let basicAuth = BasicAuthData {username: woody, password: "password" } 
