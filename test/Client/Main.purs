@@ -42,7 +42,7 @@ spec = do
       it "gets Person" $ \baseUrl -> do
         let api = client (Proxy :: _ API)
         let getOkResult = V.default (Left "bad status") # V.on (SProxy :: _ "200") (\(WithStatus _ p) -> Right p)
-        eRes <- runClientM api.person baseUrl
+        eRes <- runClientM api.person.jim baseUrl
 
         (eRes >>= getOkResult) `shouldEqual` (Right jimmy)
 
