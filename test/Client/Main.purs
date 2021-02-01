@@ -24,6 +24,7 @@ import Swerve.Client.Internal as Client
 import Swerve.Client.ClientM
 import Swerve.Server.Internal.BasicAuth (decodeBAHeader)
 import Test.API
+-- import Test.Auth.Example (GenAuthAPI)
 import Test.Spec (Spec, around, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 import Test.Spec.Reporter.Console (consoleReporter)
@@ -53,3 +54,17 @@ spec = do
         eRes <- runClientM (api.private.secret basicAuth) baseUrl
 
         (eRes >>= getOkResult) `shouldEqual` (Right (woody <> " secret"))
+
+
+
+
+
+
+
+      -- it "handles generalize auth request" $ \baseUrl -> do
+      --   let api = client (Proxy :: _ API)
+      --   let getOkResult = V.default (Left "bad status") # V.on (SProxy :: _ "200") (\(WithStatus _ p) -> Right p)
+
+      --   eRes <- runClientM (api.private.secret basicAuth) baseUrl
+
+      --   (eRes >>= getOkResult) `shouldEqual` (Right (woody <> " secret"))
