@@ -283,8 +283,8 @@ instance hasServerAuth ::
   hoistServerWithContext _ pc nt s = lift $ hoistServerWithContext (Proxy :: _ api) pc nt <<< (eval s)
   route _ m ctx subserver = route (Proxy :: Proxy api) m ctx ((evalD subserver) `addAuthCheck` (withRequest authCheck))
     where 
-      authCheck :: Request -> DelayedIO (Aff a) 
-      authCheck req = (liftAff $ authHandler req) >>= (either delayedFailFatal (pure <<< pure))
+      authCheck :: Request -> DelayedIO a 
+      authCheck req = (liftAff $ authHandler req) >>= (either delayedFailFatal pure)
 
       authHandler :: Request -> Aff (Either ServerError a)
       authHandler = unAuthHandler $ Record.get (SProxy :: _ tag) ctx

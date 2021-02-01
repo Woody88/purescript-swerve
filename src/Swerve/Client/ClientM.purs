@@ -63,8 +63,10 @@ instance runClientClientM :: RunClient ClientM' where
     let hdrs    = map (\(Tuple ck v) -> RequestHeader (unwrap ck) v) req.headers
     let method  = Method.fromString req.method 
     let content = (RequestBody.string <<< convertBody <<< fst) <$> req.body
-
+    
+    -- TODO: withCredentials = true 
     result <- liftAff $ AX.request $ AX.defaultRequest { method = method, url = url, responseFormat = ResponseFormat.string, headers = hdrs, content = content }
+    
     case result of 
       Left e -> throwClientError $ AX.printError e
       Right res -> do 

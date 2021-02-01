@@ -2,7 +2,6 @@ module Swerve.Client.Internal.Response where
 
 import Prelude 
 
-import Debug.Trace
 import Data.Either 
 import Data.Map as Map 
 import Data.Symbol
@@ -36,7 +35,7 @@ instance _asResponse ::
   , IsSymbol status
   ) => AsResponse ctypes (Cons status a Nil) x where 
   mkResponse ctypesP _ res = case reflectSymbol statusP == show res.status.code of
-    false -> Left "bad"
+    false -> Left $ "wrong status code: " <> reflectSymbol statusP  <> " =/ " <> show res.status.code
     true  -> do 
       let accH = renderHeader $ map show $ allMime ctypesP  
       bodyDecoder <-  note "could not parse accept" $ canHandleCTypeH ctypesP accH 

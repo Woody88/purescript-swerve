@@ -14,7 +14,7 @@ import Data.String (indexOf, length) as String
 import Data.String.CodeUnits (slice) as String 
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import Network.Wai (Application, Request)
+import Network.Wai (Application, Request(..))
 import Swerve.API
 import Swerve.Server
 import Swerve.Server as Server
@@ -48,10 +48,10 @@ authHandler = mkAuthHandler handler
   requestHeaders = Map.fromFoldable <<< _.headers <<< unwrap 
 
   handler :: Request -> Aff (Either ServerError Account)
-  handler req = do 
+  handler req@(Request r) = do 
     e <- runExceptT do 
           name <- ExceptT $ pure do
-            (maybeToEither "Missing cookie header" $ Map.lookup (wrap "cookie") $ requestHeaders req) 
+            (maybeToEither "Missing cookie header" $ Map.lookup (wrap "X-Cookie") $ requestHeaders req) 
               >>= (maybeToEither "Missing swerve auth cookie" <<< Map.lookup "swerve-auth-cookie" <<< Map.fromFoldable <<< parseCookies)
           lookupAccount name
     pure $ lmap (\msg -> err403 { content = msg}) e
@@ -80,7 +80,8 @@ server :: Server AuthGenAPI
 server = Server.lift { private, public }
   where 
     private :: Account -> Handler (Ok String + Nil)
-    private (Account name) = pure <<< respond (Proxy :: _ Ok') $ ("this is a secret: " <> name)
+    private (Account name) = do 
+      pure <<< respond (Proxy :: _ Ok') $ ("this is a secret: " <> name)
     
     public :: Handler (Ok String + Nil)
     public = pure <<< respond (Proxy :: _ Ok') $ "this is a public piece of data"

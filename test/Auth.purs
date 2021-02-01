@@ -36,7 +36,7 @@ spec = describe "generalized-auth" do
     let 
       accKey =  fst $ unsafePartial $ ArrayP.head TA.users 
       cookie = "swerve-auth-cookie" <> "=" <> accKey
-      request = wrap $ _ { pathInfo = [ "private", "secret" ], headers = [ Tuple (wrap "Cookie") cookie ] } $ unwrap Wai.defaultRequest
+      request = wrap $ _ { pathInfo = [ "private", "secret" ], headers = [ Tuple (wrap "X-Cookie") cookie ] } $ unwrap Wai.defaultRequest
       responseFn (Wai.ResponseString status headers message) = (status `shouldEqual` ok200) *> pure ResponseReceived
       responseFn _ = fail "fail" *> pure ResponseReceived
 
