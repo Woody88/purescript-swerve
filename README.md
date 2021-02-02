@@ -14,7 +14,31 @@ You can install this package by adding the following in your packages.dhall:
 
 ```dhall
 let additions =
-    { warp =
+    { swerve =
+        { dependencies =
+            [ "affjax"
+            , "arrays"
+            , "b64"
+            , "console"
+            , "debug"
+            , "debugged"
+            , "effect"
+            , "form-urlencoded"
+            , "heterogeneous"
+            , "http-media"
+            , "http-types"
+            , "node-http"
+            , "psci-support"
+            , "simple-json"
+            , "wai"
+            , "warp"
+            ]
+        , repo =
+            "https://github.com/Woody88/purescript-swerve.git"
+        , version =
+            "master"
+        }
+    , warp =
         { dependencies =
           [ "node-fs-aff"
           , "node-net"
@@ -120,29 +144,39 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Network.HTTP.Types (hAuthorization, hContentType, ok200)
 import Network.Wai (Application, Response(..), defaultRequest, responseStr) as Wai
+import Network.Warp.Settings (defaultSettings)
+import Network.Warp.Run (runSettings)
 import Swerve.API
 import Swerve.Server 
-import Swerve.Server (lift) as Server
+import Swerve.Server (lift, compose) as Server
 import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
+
+-- API Spec
+type API = Record 
+    ( users :: "users" :> UserAPI 
+    , raw   :: RawApp
+    )
+
+type UserAPI = Record 
+    ( get :: GetUser 
+    )
+
+type RawApp = "raw" :> Raw 
 
 type User = String
 type UserId = Int  
 type MaxAge = Int 
 type Authorization = String 
 
-type API = GetUser :<|> GetRaw 
-
 type GetUser 
-  = "users" 
-  :> Capture "userId" UserId 
+  =  Capture "userId" UserId 
   :> QueryParam "maxAge" MaxAge 
   :> Header "authorization" Authorization 
   :> ReqBody PlainText String  
   :> Get JSON (Ok User + BadRequest + NotFound + Nil)
 
-type GetRaw = "raw" :> Raw 
-
+-- Handlers 
 getUser 
   :: UserId 
   -> Maybe MaxAge 
@@ -156,12 +190,20 @@ getUser userId _ _ body = case userId of
     Console.log $ "Body: " <> body
     pure <<< respond (Proxy :: _ Ok') $ "User" <> show userId
 
-getRaw :: HandlerM Wai.Application
-getRaw = pure $ \req send -> send $ Wai.responseStr ok200 [] "Raw!"
+rawApp :: HandlerM Wai.Application
+rawApp = pure $ \req send -> send $ Wai.responseStr ok200 [] "Hello, World!"
 
-server :: Server API
-server = Server.lift (getUser :<|> getRaw)
+-- Servers 
+raw :: Server RawApp 
+raw = Server.lift rawApp 
 
+users :: Server UserAPI
+users = Server.lift { get: getUser } 
+
+server :: Server API 
+server = Server.compose { users, raw }
+
+-- WAI Application
 app :: Wai.Application
 app = serve (Proxy :: _ API) server
 
