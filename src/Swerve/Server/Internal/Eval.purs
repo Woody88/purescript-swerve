@@ -153,9 +153,15 @@ instance evalComposePath ::
   , EvalCompose api server
   ) => EvalCompose (path :> api) stri
 
+instance evalComposeRaw 
+  :: TypeEquals Application waiApp 
+  => EvalCompose Raw (m waiApp)
+
 instance evalComposeBasicAuth
   :: EvalCompose api server 
   => EvalCompose (BasicAuth realm usr :> api) (usr -> server)
+
+instance evalComposeSVerb :: EvalCompose (Verb method ctypes as) (m (Variant as))
 
 instance evalComposeAuth 
   :: EvalCompose api server 
