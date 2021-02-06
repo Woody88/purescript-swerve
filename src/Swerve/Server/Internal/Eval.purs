@@ -151,11 +151,10 @@ instance evalComposeRec :: EvalCompose (Record a) (Record a)
 instance evalComposePath :: 
   ( IsSymbol path 
   , EvalCompose api server
-  ) => EvalCompose (path :> api) stri
+  ) => EvalCompose (path :> api) server
 
 instance evalComposeRaw 
-  :: TypeEquals Application waiApp 
-  => EvalCompose Raw (m waiApp)
+  :: EvalCompose Raw raw
 
 instance evalComposeBasicAuth
   :: EvalCompose api server 

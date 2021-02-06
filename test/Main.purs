@@ -24,9 +24,10 @@ type UserId = Int
 type MaxAge = Int 
 type Authorization = String 
 
-type API = UserAPI :<|> TestAPI 
+type API = { users :: UserAPI, test :: TestAPI, raw ::  RawApp }
 
-type UserAPI = { getUser ::  GetUser, getRaw :: GetRaw } 
+type RawApp = "raw" :> Raw
+type UserAPI = { getUser ::  GetUser } 
 
 type TestAPI = {test1 :: Test1, test2 :: Test2 }
 
@@ -62,31 +63,34 @@ getUser userId _ _ body = case userId of
     Console.log $ "Body: " <> body
     pure <<< respond (Proxy :: _ Ok') $ "User1"
 
-getRaw :: HandlerM Wai.Application
-getRaw = pure $ \req send -> send $ Wai.responseStr ok200 [] "Raw!"
+rawApp :: HandlerM Wai.Application
+rawApp = pure $ \req send -> send $ Wai.responseStr ok200 [] "Raw!"
+
+raw :: Server RawApp 
+raw = Server.lift rawApp 
 
 userAPI :: Server UserAPI
-userAPI = Server.lift {getUser, getRaw }
+userAPI = Server.lift {getUser }
 
 testAPI :: Server TestAPI
 testAPI = Server.lift {test1, test2 }
 
 server :: Server API
-server = Server.compose (userAPI :<|> testAPI)
+server = Server.compose { users: userAPI, test: testAPI, raw }
 
-app :: Wai.Application
-app = serve (Proxy :: _ API) server
+-- app :: Wai.Application
+-- app = serve (Proxy :: _ API) server
 
-main :: Effect Unit
-main = Aff.launchAff_ do 
-  stream <- liftEffect $ newStream "Hello, World!"
-  app (request stream) responseFn
-  where 
-    request s = wrap $ _ { body = Just s,  pathInfo = [ "tests", "test2" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
-    responseFn (Wai.ResponseString status headers message) = do 
-      liftEffect $ D.eval { status, headers, message }
-      pure ResponseReceived
-    responseFn _ = liftEffect $ D.eval "bad response" *> pure ResponseReceived
+-- main :: Effect Unit
+-- main = Aff.launchAff_ do 
+--   stream <- liftEffect $ newStream "Hello, World!"
+--   app (request stream) responseFn
+--   where 
+--     request s = wrap $ _ { body = Just s,  pathInfo = [ "tests", "test2" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
+--     responseFn (Wai.ResponseString status headers message) = do 
+--       liftEffect $ D.eval { status, headers, message }
+--       pure ResponseReceived
+--     responseFn _ = liftEffect $ D.eval "bad response" *> pure ResponseReceived
 
 
 -- -- -- app' :: Wai.Application
