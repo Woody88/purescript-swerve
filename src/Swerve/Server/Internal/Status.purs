@@ -7,7 +7,7 @@ type WithStatusString status = WithStatus status String
 
 type Ok a r = ("200" :: WithStatus Ok' a | r) 
 type Created a r = ("201" :: WithStatus Created' a | r) 
-type NoContent r = ("201" :: WithStatusString NoContent' | r)
+type NoContent r = ("204" :: WithStatusString NoContent' | r)
 type MovedPermanently r = ("301" :: WithStatusString MovedPermanently' | r )
 
 type BadRequest r = ("400" :: WithStatusString BadRequest' | r)
