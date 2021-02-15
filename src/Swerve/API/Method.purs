@@ -1,7 +1,7 @@
 module Swerve.API.Method where
 
 import Network.HTTP.Types (Method)
-import Network.HTTP.Types.Method (methodGet, methodPost)
+import Network.HTTP.Types.Method (methodGet, methodPost, methodPatch, methodPut, methodDelete)
 import Swerve.API.Types (Method')
 import Type.Proxy (Proxy)
 
@@ -20,3 +20,12 @@ instance getMethod :: ToMethod GET' where
 
 instance postMethod :: ToMethod POST' where  
   toMethod _ = methodPost
+
+instance patchMethod :: ToMethod PATCH' where  
+  toMethod _ = methodPatch 
+
+instance putMethod :: ToMethod PUT' where  
+  toMethod _ = methodPut 
+
+instance deleteMethod :: ToMethod DELETE' where  
+  toMethod _ = methodDelete 
