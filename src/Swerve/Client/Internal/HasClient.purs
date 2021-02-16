@@ -126,8 +126,7 @@ instance _hasClientQueryParam ::
       clientWithRoute pm (Proxy :: _ api) req { queryString = queryString' }
 
 instance _hasClientReqBody :: 
-  ( IsSymbol name 
-  , MimeRender ct a
+  ( MimeRender ct a
   , HasClient m api 
   ) => HasClient m (ReqBody ct a :> api) where 
   clientWithRoute pm _ req = 
