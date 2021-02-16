@@ -1,9 +1,10 @@
 module Swerve.Client.Internal.HasClient where
 
 import Prelude 
+import Data.Array as Array
 import Data.Array.NonEmpty as NE
 import Data.Either 
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (wrap)
 import Data.Symbol
 import Data.Tuple.Nested ((/\))
@@ -14,11 +15,12 @@ import Prim.Row as Row
 import Prim.RowList as RL
 import Record.Builder (Builder)
 import Record.Builder as Builder
-import Swerve.API.Alternative (type (:<|>), (:<|>))
+import Network.HTTP.Media.MediaType
+import Swerve.API.Alternative (type (:<|>), type (:), (:<|>))
 import Swerve.API.Auth (AuthProtect)
 import Swerve.API.BasicAuth (BasicAuth)
 import Swerve.API.Capture 
-import Swerve.API.ContentType (class MimeRender, class MimeUnrender, mimeRender, mimeUnrender, contentTypes)
+import Swerve.API.ContentType (class AllMime, class MimeRender, class MimeUnrender, mimeRender, mimeUnrender, allMime)
 import Swerve.API.Header 
 import Swerve.API.QueryParam 
 import Swerve.API.Method (class ToMethod, toMethod)
@@ -74,17 +76,20 @@ instance _hasClientAlt ::
   clientWithRoute pm _ req = lift $ clientWithRoute pm (Proxy :: _ a) req :<|> clientWithRoute pm (Proxy :: _ b) req
 
 instance _hasClientVerb :: 
-  ( AsResponse cts rl r  
+  ( AsResponse cts rl r 
   , RowToList r rl 
   , RunClient m 
   , ToMethod method
+  , AllMime cts 
   ) => HasClient m (Verb method cts r) where
   clientWithRoute pm _ req = 
-    lift $ runRequest (req { method = method'}) >>= (either throwClientError pure <<< mkResponse ctypesP rlP)
+    lift $ runRequest req' >>= (either throwClientError pure <<< mkResponse ctypesP rlP)
     where 
+      req'    = req { method = method', accept = [accept'] }
       ctypesP = Proxy :: _ cts 
       rlP     = Proxy :: _ rl 
       method' = toMethod (Proxy :: _ method)
+      accept' = fromMaybe (mkMediaType "text" "plain") <<< Array.head $ allMime ctypesP   --- TODO: Need a better implementation
 
 instance _hasClientRaw :: RunClient m => HasClient m Raw where
   clientWithRoute pm _ req = lift $ \httpMethod -> runRequest req { method = show httpMethod }
@@ -129,14 +134,15 @@ instance _hasClientQueryParam ::
       clientWithRoute pm (Proxy :: _ api) req { queryString = queryString' }
 
 instance _hasClientReqBody :: 
-  ( MimeRender ct a
+  ( MimeRender cts a
   , HasClient m api 
-  ) => HasClient m (ReqBody ct a :> api) where 
+  , AllMime cts 
+  ) => HasClient m (ReqBody cts a :> api) where 
   clientWithRoute pm _ req = 
     lift $ \body -> do 
-      let ctypesP   = (Proxy :: _ ct)
+      let ctypesP   = (Proxy :: _ cts)
       let body'     = mimeRender ctypesP body
-      let mediaType = NE.head $ contentTypes ctypesP
+      let mediaType = fromMaybe (mkMediaType "text" "plain") <<< Array.head $ allMime ctypesP
       clientWithRoute pm (Proxy :: _ api) req { body = Just (RequestBodyStr body' /\ mediaType)  }
 
 instance _hasClientBasicAuth :: 
