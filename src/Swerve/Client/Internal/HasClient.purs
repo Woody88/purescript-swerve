@@ -21,6 +21,7 @@ import Swerve.API.Capture
 import Swerve.API.ContentType (class MimeRender, class MimeUnrender, mimeRender, mimeUnrender, contentTypes)
 import Swerve.API.Header 
 import Swerve.API.QueryParam 
+import Swerve.API.Method (class ToMethod, toMethod)
 import Swerve.API.Sub 
 import Swerve.API.ReqBody
 import Swerve.API.Raw 
@@ -76,12 +77,14 @@ instance _hasClientVerb ::
   ( AsResponse cts rl r  
   , RowToList r rl 
   , RunClient m 
+  , ToMethod method
   ) => HasClient m (Verb method cts r) where
   clientWithRoute pm _ req = 
-    lift $ runRequest req >>= (either throwClientError pure <<< mkResponse ctypesP rlP)
+    lift $ runRequest (req { method = method'}) >>= (either throwClientError pure <<< mkResponse ctypesP rlP)
     where 
       ctypesP = Proxy :: _ cts 
       rlP     = Proxy :: _ rl 
+      method' = toMethod (Proxy :: _ method)
 
 instance _hasClientRaw :: RunClient m => HasClient m Raw where
   clientWithRoute pm _ req = lift $ \httpMethod -> runRequest req { method = show httpMethod }
