@@ -16,6 +16,7 @@ import Prim.RowList as RL
 import Record.Builder (Builder)
 import Record.Builder as Builder
 import Network.HTTP.Media.MediaType
+import Network.HTTP.Types (hContentType)
 import Swerve.API.Alternative (type (:<|>), type (:), (:<|>))
 import Swerve.API.Auth (AuthProtect)
 import Swerve.API.BasicAuth (BasicAuth)
@@ -143,7 +144,8 @@ instance _hasClientReqBody ::
       let ctypesP   = (Proxy :: _ cts)
       let body'     = mimeRender ctypesP body
       let mediaType = fromMaybe (mkMediaType "text" "plain") <<< Array.head $ allMime ctypesP
-      clientWithRoute pm (Proxy :: _ api) req { body = Just (RequestBodyStr body' /\ mediaType)  }
+    
+      clientWithRoute pm (Proxy :: _ api) req { body = Just (RequestBodyStr body' /\ mediaType), headers = [hContentType /\ show mediaType] <> req.headers  }
 
 instance _hasClientBasicAuth :: 
   ( IsSymbol realm 
