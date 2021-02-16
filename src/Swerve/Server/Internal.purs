@@ -113,7 +113,7 @@ instance hasServerAlt ::
       pa = Proxy :: _ a 
       pb = Proxy :: _ b 
 
-data EncodeResponse (ctypes :: ContentType') = EncodeResponse AcceptHeader
+data EncodeResponse (ctypes :: Type) = EncodeResponse AcceptHeader
 
 newtype EncodedResponse = EncodedResponse (Tuple H.Status (Maybe (Tuple String String)))
 
