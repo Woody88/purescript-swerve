@@ -45,5 +45,5 @@ import Swerve.API.Status.Types ( Accepted', BadGateway', BadRequest', Conflict',
                                ) as StatusTypes
 
 import Swerve.API.Sub (type (:>), Sub) as Sub 
-import Swerve.API.Types (ContentType', Method', Status', Verb') as Types 
+import Swerve.API.Types (Status', Verb') as Types 
 import Swerve.API.Verb (Delete, Get, Patch, Post, Put, Verb) as Verb 

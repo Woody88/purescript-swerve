@@ -1,9 +1,8 @@
 module Swerve.API.Verb where
 
 import Swerve.API.Method (GET', POST', PUT', PATCH', DELETE')
-import Swerve.API.Types (Method', ContentType')
 
-data Verb :: forall k. Method' -> Type -> k -> Type
+data Verb :: forall k. Type -> Type -> k -> Type
 data Verb m cts as 
 
 type Get :: forall k. Type -> k -> Type

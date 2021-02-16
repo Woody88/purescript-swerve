@@ -54,13 +54,12 @@ import Simple.JSON (class WriteForeign)
 import Simple.JSON as Json
 import Swerve.API.Alternative (type (:))
 import Swerve.API.Status (WithStatus(..))
-import Swerve.API.Types (ContentType')
 import Type.Proxy (Proxy(..))
 
-foreign import data Star :: ContentType'
-foreign import data JSON :: ContentType'
-foreign import data PlainText :: ContentType'
-foreign import data FormUrlEncoded :: ContentType'
+data Star 
+data JSON 
+data PlainText 
+data FormUrlEncoded 
 
 data NoContent = NoContent 
 
