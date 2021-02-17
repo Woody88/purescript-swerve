@@ -54,6 +54,7 @@ import Simple.JSON (class WriteForeign)
 import Simple.JSON as Json
 import Swerve.API.Alternative (type (:))
 import Swerve.API.Status (WithStatus(..))
+import Swerve.API.Status.Types (NoContent')
 import Type.Proxy (Proxy(..))
 
 data Star 
@@ -171,7 +172,10 @@ class MimeUnrender :: forall k. k -> Type -> Constraint
 class Accept ctype <= MimeUnrender ctype a where
     mimeUnrender :: Proxy ctype -> String -> Either String a    
 
-instance mimeUnrenderWithStatusJson :: MimeUnrender JSON a => MimeUnrender JSON (WithStatus status a) where  
+instance mimeUnrenderWithStatusNoContent :: MimeUnrender JSON (WithStatus NoContent' String) where  
+    mimeUnrender p input = pure $ WithStatus Proxy mempty
+
+else instance mimeUnrenderWithStatusJson :: MimeUnrender JSON a => MimeUnrender JSON (WithStatus status a) where  
     mimeUnrender p input = WithStatus Proxy <$> mimeUnrender p input
 
 else instance mimeUnrenderJson :: Json.ReadForeign a => MimeUnrender JSON a where 
