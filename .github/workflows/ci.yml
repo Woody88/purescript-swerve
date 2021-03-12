@@ -32,7 +32,9 @@ jobs:
           path: |
             .spago
             output
-            
+
+      - run: npm install  
+
       - run: spago build
   
       - run: spago -x spago.test.dhall build 
