@@ -117,79 +117,65 @@ let additions =
 -------------------------------
 -}
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20201223/packages.dhall sha256:a1a8b096175f841c4fef64c9b605fb0d691229241fd2233f6cf46e213de8a185
+      https://github.com/purescript/package-sets/releases/download/psc-0.14.0-20210308/packages.dhall sha256:5a86da7913f6c84adc2efacfad49ca135af8f62235e7270d9b952a8dda3c4b47
 
-let overrides =
-      { metadata = upstream.metadata // { version = "v0.14.0-rc4" }
-      , prelude = upstream.prelude //  { version = "cfd87116c9dd1eeeb75cf83ffaeac0224f159ed9" }
-      , record = upstream.record // { version = "ps-0.14" }
-      , simple-json = upstream.simple-json // { version = "ps-0.14" }
-      , typelevel-prelude = upstream.typelevel-prelude // { version = "master" }
-      , type-equality = upstream.type-equality // { version = "master" }
-      , heterogeneous = 
-            upstream.heterogeneous // { repo = "https://github.com/Woody88/purescript-heterogeneous.git"
-                                , version = "polykindsUpdate"
-                                }
-      , variant = 
-            upstream.variant // { repo = "https://github.com/Woody88/purescript-variant.git"
-                                , version = "polykindsUpdate"
-                                }
-      }
-
-let additions =
-      { warp =
-        { dependencies =
-          [ "console", "effect", "node-fs-aff", "generics-rep", "wai" ]
-        , repo = "https://github.com/Woody88/purescript-warp.git"
-        , version = "master"
-        }
-      , debugged =
-        { dependencies =
-          [ "console"
-          , "effect"
-          , "prelude"
-          , "strings"
-          , "record"
-          , "ordered-collections"
-          , "either"
-          , "tuples"
-          , "lists"
-          , "arrays"
-          , "bifunctors"
-          , "generics-rep"
-          , "datetime"
-          , "enums"
-          ]
-        , repo = "https://github.com/Woody88/purescript-debugged.git"
-        , version = "ps-0.14"
-        }
-      , wai =
-        { dependencies = [ "effect", "aff", "http-types", "node-net" ]
-        , repo = "https://github.com/Woody88/purescript-wai.git"
-        , version = "master"
-        }
-      , http-types =
-        { dependencies = [ "tuples", "unicode", "generics-rep" ]
-        , repo = "https://github.com/Woody88/purescript-http-types.git"
-        , version = "master"
-        }
-      , http-media =
-        { dependencies =
-          [ "console"
-          , "effect"
-          , "exceptions"
-          , "foldable-traversable"
-          , "maybe"
-          , "newtype"
-          , "numbers"
-          , "ordered-collections"
-          , "strings"
-          , "stringutils"
-          , "unicode"
-          ]
-        , repo = "https://github.com/Woody88/purescript-http-media.git"
-        , version = "master"
-        }
-      }
-
-in  upstream // overrides // additions
+in  upstream
+  with b64 = 
+    { dependencies =
+      [ "console", "effect", "node-fs-aff", "wai", "encoding" ]
+    , repo = "https://github.com/CarstenKoenig/purescript-b64.git"
+    , version = "purescript-0.14"
+    }
+  with warp =
+    { dependencies =
+      [ "console", "effect", "node-fs-aff", "wai" ]
+    , repo = "https://github.com/Woody88/purescript-warp.git"
+    , version = "master"
+    }
+  with debugged =
+    { dependencies =
+      [ "console"
+      , "effect"
+      , "prelude"
+      , "strings"
+      , "record"
+      , "ordered-collections"
+      , "either"
+      , "tuples"
+      , "lists"
+      , "arrays"
+      , "bifunctors"
+      , "datetime"
+      , "enums"
+      ]
+    , repo = "https://github.com/Woody88/purescript-debugged.git"
+    , version = "ps-0.14"
+    }
+  with wai =
+    { dependencies = [ "effect", "aff", "http-types", "node-net" ]
+    , repo = "https://github.com/Woody88/purescript-wai.git"
+    , version = "master"
+    }
+  with http-types =
+    { dependencies = [ "js-uri", "tuples", "unicode" ]
+    , repo = "https://github.com/Woody88/purescript-http-types.git"
+    , version = "master"
+    }
+  with http-media =
+    { dependencies =
+      [ "console"
+      , "effect"
+      , "exceptions"
+      , "foldable-traversable"
+      , "maybe"
+      , "newtype"
+      , "numbers"
+      , "ordered-collections"
+      , "psci-support"
+      , "strings"
+      , "stringutils"
+      , "unicode"
+      ]
+    , repo = "https://github.com/Woody88/purescript-http-media.git"
+    , version = "master"
+    }

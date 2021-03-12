@@ -63,7 +63,7 @@ class HasServerRow rl api context m | rl -> context m where
 
 instance hasServerRowNil :: HasServerRow RL.Nil (Record routes) context m where 
   hoistRowsWithContext _ pc nt s = unsafeCoerce s
-  routeList _ _ _ _ = StaticRouter mempty mempty
+  routeList _ _ _ _ = StaticRouter Map.empty mempty
 
 instance hasServerRowCons :: 
   ( IsSymbol name 

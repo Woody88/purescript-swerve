@@ -5,6 +5,8 @@ You can edit this file as you like.
 { name = "purescript-swerve"
 , dependencies =
   [ "affjax"
+  , "argonaut"
+  , "argonaut-codecs"
   , "arrays"
   , "b64"
   , "console"
@@ -17,7 +19,6 @@ You can edit this file as you like.
   , "http-types"
   , "node-http"
   , "psci-support"
-  , "simple-json"
   , "wai"
   , "warp"
   ]

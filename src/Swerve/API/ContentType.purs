@@ -35,6 +35,7 @@ module Swerve.API.ContentType
 
 import Prelude
 
+import Data.Argonaut (class EncodeJson, class DecodeJson, printJsonDecodeError, parseJson, decodeJson, encodeJson, stringify)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NE
@@ -50,8 +51,6 @@ import Network.HTTP.Media as H
 import Network.HTTP.Media as M
 import Network.HTTP.Media as Media
 import Prim.TypeError as TE
-import Simple.JSON (class WriteForeign)
-import Simple.JSON as Json
 import Swerve.API.Alternative (type (:))
 import Swerve.API.Status (WithStatus(..))
 import Swerve.API.Status.Types (NoContent')
@@ -66,8 +65,9 @@ data NoContent = NoContent
 
 newtype AcceptHeader = AcceptHeader String 
 
-instance writeForeignNoContent :: WriteForeign NoContent where 
-    writeImpl _ = Json.undefined
+-- Need to review this 
+-- instance writeForeignNoContent :: WriteForeign NoContent where 
+--     writeImpl _ = Json.undefined
 
 derive instance eqAcceptHeader :: Eq AcceptHeader
 
@@ -118,8 +118,8 @@ class Accept ctype <= MimeRender ctype a where
 instance mimeRenderWithStatusJsob :: MimeRender JSON a => MimeRender JSON (WithStatus status a) where
     mimeRender p (WithStatus _ a) = mimeRender p a 
 
-else instance mimeRenderJson :: Json.WriteForeign a => MimeRender JSON a where 
-    mimeRender _ = Json.writeJSON
+else instance mimeRenderJson :: EncodeJson a => MimeRender JSON a where 
+    mimeRender _ = stringify <<< encodeJson
 
 instance mimeRenderWithStatusText :: MimeRender PlainText a => MimeRender PlainText (WithStatus status a) where
     mimeRender p (WithStatus _ a) = mimeRender p a 
@@ -130,8 +130,9 @@ instance mimeRenderPlainTextString :: MimeRender PlainText String where
 instance mimeRenderPlainTextNoContent :: MimeRender PlainText NoContent where 
     mimeRender _ = mempty
 
-instance mimeRenderPlainTextRecord :: WriteForeign (Record r) => MimeRender PlainText (Record r) where 
-    mimeRender _ = Json.writeJSON
+-- Need to review this 
+-- instance mimeRenderPlainTextRecord :: WriteForeign (Record r) => MimeRender PlainText (Record r) where 
+--     mimeRender _ = Json.writeJSON
 
 instance mimeRenderFormUrlEncoded :: MimeRender FormUrlEncoded FormURLEncoded where 
     mimeRender _ = fromMaybe mempty <<< FormURLEncoded.encode
@@ -178,11 +179,8 @@ instance mimeUnrenderWithStatusNoContent :: MimeUnrender JSON (WithStatus NoCont
 else instance mimeUnrenderWithStatusJson :: MimeUnrender JSON a => MimeUnrender JSON (WithStatus status a) where  
     mimeUnrender p input = WithStatus Proxy <$> mimeUnrender p input
 
-else instance mimeUnrenderJson :: Json.ReadForeign a => MimeUnrender JSON a where 
-    mimeUnrender _ = lmap renderError <<< Json.readJSON 
-        where 
-            renderError :: Foreign.MultipleErrors -> String 
-            renderError = show <<< map Foreign.renderForeignError
+else instance mimeUnrenderJson :: DecodeJson a => MimeUnrender JSON a where 
+    mimeUnrender _ s = lmap printJsonDecodeError $ decodeJson =<< parseJson s
 
 instance mimeUnrenderPlainText ::  MimeUnrender PlainText String where 
     mimeUnrender _ x = Right x
