@@ -8,120 +8,73 @@ A major, difference is the use of row types instead of introducing numerous comb
 ## Installation
 
 ***This library is not yet published to pursuit.***  
-***You will need to use purescript 0.14***  
+***You will need to use purescript 0.14 and above***  
 You can install this package by adding the following in your packages.dhall:
 
 <details>
 
 
 ```dhall
-let additions =
-    { swerve =
-        { dependencies =
-            [ "affjax"
-            , "arrays"
-            , "b64"
-            , "console"
-            , "debug"
-            , "debugged"
-            , "effect"
-            , "form-urlencoded"
-            , "heterogeneous"
-            , "http-media"
-            , "http-types"
-            , "node-http"
-            , "psci-support"
-            , "simple-json"
-            , "wai"
-            , "warp"
-            ]
-        , repo =
-            "https://github.com/Woody88/purescript-swerve.git"
-        , version =
-            "master"
-        }
-    , warp =
-        { dependencies =
-          [ "node-fs-aff"
-          , "node-net"
-          , "node-url"
-          , "wai"
-          ]
-        , repo =
-            "https://github.com/Woody88/purescript-warp.git"
-        , version =
-            "master"
-        }
-    , debugged =
-        { dependencies =
-            [ "console"
-            , "effect"
-            , "prelude"
-            , "strings"
-            , "record"
-            , "ordered-collections"
-            , "either"
-            , "tuples"
-            , "lists"
-            , "arrays"
-            , "bifunctors"
-            , "generics-rep"
-            , "datetime"
-            , "enums"
-            ]
-        , repo =
-            "https://github.com/Woody88/purescript-debugged.git"
-        , version =
-            "ps-0.14"
-        } 
-    , wai =
-        { dependencies =
-            [ "http-types"
-            , "node-buffer"
-            , "node-http"
-            , "node-net"
-            , "node-streams"
-            , "node-url"
-            ]
-        , repo =
-            "https://github.com/Woody88/purescript-wai.git"
-        , version =
-            "master"
-        }
-    , http-types =
-        { dependencies =
-            [ "console"
-            , "effect"
-            , "psci-support"
-            , "tuples"
-            , "unicode"
-            , "uri"
-            ]
-        , repo =
-            "https://github.com/Woody88/purescript-http-types.git"
-        , version =
-            "master"
-        }
-    , http-media =
-        { dependencies =
-            [ "console"
-            , "effect"
-            , "exceptions"
-            , "foldable-traversable"
-            , "maybe"
-            , "newtype"
-            , "numbers"
-            , "ordered-collections"
-            , "proxy"
-            , "strings"
-            , "stringutils"
-            , "unicode"
-            ]
-        , repo =
-            "https://github.com/Woody88/purescript-http-media.git"
-        , version =
-            "master"
-        }
+in  upstream
+  with b64 = 
+    { dependencies =
+      [ "console", "effect", "node-fs-aff", "wai", "encoding" ]
+    , repo = "https://github.com/CarstenKoenig/purescript-b64.git"
+    , version = "purescript-0.14"
+    }
+  with warp =
+    { dependencies =
+      [ "console", "effect", "node-fs-aff", "wai" ]
+    , repo = "https://github.com/Woody88/purescript-warp.git"
+    , version = "master"
+    }
+  with debugged =
+    { dependencies =
+      [ "console"
+      , "effect"
+      , "prelude"
+      , "strings"
+      , "record"
+      , "ordered-collections"
+      , "either"
+      , "tuples"
+      , "lists"
+      , "arrays"
+      , "bifunctors"
+      , "datetime"
+      , "enums"
+      ]
+    , repo = "https://github.com/Woody88/purescript-debugged.git"
+    , version = "ps-0.14"
+    }
+  with wai =
+    { dependencies = [ "effect", "aff", "http-types", "node-net" ]
+    , repo = "https://github.com/Woody88/purescript-wai.git"
+    , version = "master"
+    }
+  with http-types =
+    { dependencies = [ "js-uri", "tuples", "unicode" ]
+    , repo = "https://github.com/Woody88/purescript-http-types.git"
+    , version = "master"
+    }
+  with http-media =
+    { dependencies =
+      [ "console"
+      , "effect"
+      , "exceptions"
+      , "foldable-traversable"
+      , "maybe"
+      , "newtype"
+      , "numbers"
+      , "ordered-collections"
+      , "psci-support"
+      , "strings"
+      , "stringutils"
+      , "unicode"
+      ]
+    , repo = "https://github.com/Woody88/purescript-http-media.git"
+    , version = "master"
+    }
 ```
 ```console
 user@user:~$ spago install swerve
