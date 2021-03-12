@@ -1,4 +1,4 @@
-module Test.Auth.Example where 
+module Test.API.Auth where 
 
 import Prelude 
 

@@ -2,6 +2,7 @@ module Test.BasicAuth where
 
 import Prelude
 
+import Data.Argonaut (encodeJson, stringify)
 import Data.Array.Partial as ArrayP
 import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap, unwrap)
@@ -13,10 +14,9 @@ import Network.HTTP.Types (hAuthorization, ok200, unauthorized401)
 import Network.Wai as Wai
 import Network.Wai.Internal
 import Partial.Unsafe (unsafePartial)
-import Simple.JSON (writeJSON)
 import Swerve.API.BasicAuth (BasicAuthData(..))
 import Swerve.Server.Internal.BasicAuth (decodeBAHeader)
-import Test.BasicAuth.Example as TBA
+import Test.API.BasicAuth as TBA
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 import Test.Spec.Reporter.Console (consoleReporter)
@@ -58,7 +58,7 @@ spec = describe "basic-auth" do
       request = wrap $ _ { pathInfo = [ "mysite" ], headers = [Tuple hAuthorization ("Basic " <> userpass)] } $ unwrap Wai.defaultRequest
       responseFn (Wai.ResponseString status headers message) = do
         status `shouldEqual` ok200
-        message `shouldEqual` (writeJSON website)
+        message `shouldEqual` (stringify $ encodeJson website)
         pure ResponseReceived
       responseFn _ = fail "fail" *> pure ResponseReceived
 

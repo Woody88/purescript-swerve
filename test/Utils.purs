@@ -1,4 +1,4 @@
-module Test.Stream where 
+module Test.Utils where  
 
 import Effect 
 import Node.Stream (Readable)

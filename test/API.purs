@@ -11,7 +11,6 @@ import Network.Warp.Settings
 import Network.Warp.Run
 import Node.HTTP as HTTP
 import Node.Net.Server as Net
-import Partial.Unsafe (unsafePartial)
 import Swerve.Client.ClientM
 import Swerve.API
 import Swerve.Server  
@@ -87,7 +86,7 @@ getServerPort httpserver = do
     maddr <- Net.address netserver
     case maddr of 
       Nothing -> done <<< Left $ error "Server is not listening, verify that its properly binded to a port."
-      Just addr -> done $ Right $ unsafePartial $ fromLeft $ addr
+      Just addr -> done $ either Right (Left <<< error) addr
     pure nonCanceler
 
 withStubbedApi :: Settings -> Application -> (BaseUrl -> Aff Unit) -> Aff Unit

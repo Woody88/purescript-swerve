@@ -1,39 +1,31 @@
-module Test.Client.Main where 
+module Test.Client.General where 
 
 import Prelude
 
-import Data.Either
+import Data.Either (Either(..))
 import Data.Array.Partial as ArrayP
-import Data.Maybe (Maybe(..))
-import Data.Newtype (wrap, unwrap)
-import Data.String.Base64 as Base64
-import Data.Symbol
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Newtype (wrap)
+import Data.Symbol (SProxy(..))
 import Data.Tuple.Nested ((/\))
 import Data.Variant as V 
 import Effect (Effect)
 import Effect.Aff (launchAff_)
-import Network.HTTP.Types (hAuthorization, ok200, unauthorized401)
-import Network.Wai as Wai
-import Network.Warp.Settings
+import Network.Warp.Settings (defaultSettings)
 import Partial.Unsafe (unsafePartial)
-import Simple.JSON (writeJSON)
-import Swerve.API.Status
+import Swerve.API.Status (WithStatus(..))
 import Swerve.API.BasicAuth (BasicAuthData(..))
-import Swerve.Client.Internal
-import Swerve.Client.Internal as Client
-import Swerve.Client.Internal.Auth (AuthenticatedRequest, mkAuthenticatedRequest)
-import Swerve.Client.ClientM
-import Swerve.Server.Internal.BasicAuth (decodeBAHeader)
+import Swerve.Client.Internal (client)
+import Swerve.Client.Internal.Auth (mkAuthenticatedRequest)
+import Swerve.Client.ClientM (runClientM)
 import Swerve.Client.Internal.Request (addHeader)
-import Test.API
-import Test.Auth.Example (AuthGenAPI)
-import Test.Auth.Example as TA
+import Test.API (API, apiApp, jimmy, withStubbedApi)
+import Test.API.Auth (AuthGenAPI)
+import Test.API.Auth as TA
 import Test.Spec (Spec, around, describe, it)
-import Test.Spec.Assertions (fail, shouldEqual)
+import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner (runSpec)
-import Type.Proxy
+import Type.Proxy (Proxy(..))
 
 main :: Effect Unit
 main = launchAff_ $ runSpec [consoleReporter] spec  
@@ -42,7 +34,7 @@ spec :: Spec Unit
 spec = do 
   let settings = defaultSettings { port = 0 }
 
-  describe "client" do
+  describe "general" do
     around (withStubbedApi settings apiApp) do
       
         it "gets Person" $ \baseUrl -> do

@@ -11,7 +11,7 @@ import Network.HTTP.Types (ok200, forbidden403)
 import Network.Wai as Wai
 import Network.Wai.Internal
 import Partial.Unsafe (unsafePartial)
-import Test.Auth.Example as TA
+import Test.API.Auth as TA
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 import Test.Spec.Reporter.Console (consoleReporter)

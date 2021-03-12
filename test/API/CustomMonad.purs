@@ -1,4 +1,4 @@
-module Test.CustomMonad where
+module Test.API.CustomMonad where
 
 import Prelude
 
@@ -17,7 +17,6 @@ import Network.Wai.Internal
 import Swerve.API 
 import Swerve.Server
 import Swerve.Server (lift) as Server
-import Test.Stream (newStream)
 import Type.Proxy (Proxy(..))
 
 type ReaderApp a = ReaderAppM (ResponseV a)
@@ -51,14 +50,3 @@ server = hoistServer readerApi nt readerServer
 
 app :: Wai.Application
 app = serve (Proxy :: _ ReaderAPI) server
-
-main :: Effect Unit
-main = Aff.launchAff_ do 
-  stream <- liftEffect $ newStream "Hello, World!"
-  app (request stream) responseFn
-  where 
-    request s = wrap $ _ { body = Just s,  pathInfo = [ "raw" ], queryString = [ Tuple "maxAge" (Just "30") ], headers = [Tuple hContentType "text/plain", Tuple hAuthorization "Basic d29vZHk6cGFyc3N3b3Jk"]  } $ unwrap Wai.defaultRequest
-    responseFn (Wai.ResponseString status headers message) = do 
-      liftEffect $ D.eval { status, headers, message }
-      pure ResponseReceived
-    responseFn _ = liftEffect $ D.eval "bad response" *> pure ResponseReceived
