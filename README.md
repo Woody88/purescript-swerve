@@ -1,3 +1,5 @@
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Woody88/purescript-swerve/blob/master/LICENSE)
+![CI](https://github.com/Woody88/purescript-swerve/workflows/CI/badge.svg?branch=master)
 # Swerve 
 
 Swerve is a type-level server and client library heavily inspired by Haskell's Servant library. 
