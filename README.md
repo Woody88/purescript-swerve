@@ -2,7 +2,7 @@
 ![CI](https://github.com/Woody88/purescript-swerve/workflows/CI/badge.svg?branch=master)
 # Swerve 
 
-Swerve is a library that offers a type-level DSL for describing server and client web applications.
+Swerve is a library that offers a type-level DSL for describing server and client web applications. 
 
 ## Installation
 
@@ -15,6 +15,29 @@ You can install this package by adding the following in your packages.dhall:
 
 ```dhall
 in  upstream
+  with swerve = 
+    { dependencies =
+      [ "affjax"
+      , "argonaut"
+      , "argonaut-codecs"
+      , "arrays"
+      , "b64"
+      , "console"
+      , "debug"
+      , "debugged"
+      , "effect"
+      , "form-urlencoded"
+      , "heterogeneous"
+      , "http-media"
+      , "http-types"
+      , "node-http"
+      , "psci-support"
+      , "wai"
+      , "warp"
+      ]
+    , repo = "https://github.com/Woody88/purescript-swerve.git"
+    , version = "master"
+    }
   with b64 = 
     { dependencies =
       [ "console", "effect", "node-fs-aff", "wai", "encoding" ]
