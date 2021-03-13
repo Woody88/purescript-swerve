@@ -2,8 +2,7 @@
 ![CI](https://github.com/Woody88/purescript-swerve/workflows/CI/badge.svg?branch=master)
 # Swerve 
 
-Swerve is a type-level server and client library heavily inspired by Haskell's Servant library. 
-A major, difference is the use of row types instead of introducing numerous combinators. 
+Swerve is a library that offers a type-level DSL for describing server and client web applications.
 
 ## Installation
 
